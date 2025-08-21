@@ -6,7 +6,7 @@ A comprehensive full-stack agentic AI system for doctor appointment scheduling a
 
 This system implements a true agentic AI architecture where the LLM autonomously decides which tools to use based on natural language input:
 
-<img width="643" height="418" alt="image" src="https://github.com/user-attachments/assets/61f9fb6d-fbae-476c-ad04-5a6e87085bfd" />
+
 
 
 <img width="598" height="432" alt="image" src="https://github.com/user-attachments/assets/d7801a65-2c3e-4e25-89b1-4951dcd6e04c" />
@@ -69,7 +69,6 @@ This system implements a true agentic AI architecture where the LLM autonomously
 
 ### 1. Database Setup
 
-\`\`\`bash
 # Run the database setup scripts
 python scripts/01_create_database_schema.sql
 python scripts/02_seed_sample_data.sql
