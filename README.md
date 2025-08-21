@@ -8,25 +8,9 @@ This system implements a true agentic AI architecture where the LLM autonomously
 
 <img width="643" height="418" alt="image" src="https://github.com/user-attachments/assets/61f9fb6d-fbae-476c-ad04-5a6e87085bfd" />
 
-\`\`\`
-┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
-│   React Frontend │    │  FastAPI Backend │    │   PostgreSQL    │
-│                 │    │                  │    │    Database     │
-│ • Chat Interface│◄──►│ • MCP Protocol   │◄──►│                 │
-│ • Role Selection│    │ • LLM Agent      │    │ • Appointments  │
-│ • Notifications │    │ • Tool Registry  │    │ • Doctors       │
-│ • Dashboards    │    │ • WebSocket      │    │ • Patients      │
-└─────────────────┘    └──────────────────┘    └─────────────────┘
-                                │
-                                ▼
-                       ┌──────────────────┐
-                       │  External APIs   │
-                       │                  │
-                       │ • Google Calendar│
-                       │ • Email Service  │
-                       │ • OpenAI GPT-4   │
-                       └──────────────────┘
-\`\`\`
+
+<img width="598" height="432" alt="image" src="https://github.com/user-attachments/assets/d7801a65-2c3e-4e25-89b1-4951dcd6e04c" />
+
 
 ## 🚀 Key Features
 
@@ -98,36 +82,36 @@ python scripts/database_models.py
 cd backend
 pip install -r requirements.txt
 
-# Copy environment template
+Copy environment template
 cp .env.example .env
 
-# Edit .env with your credentials:
-# - DATABASE_URL
-# - OPENAI_API_KEY
-# - Google Calendar credentials (optional)
-# - Email service credentials (optional)
+Edit .env with your credentials:
+- DATABASE_URL
+- OPENAI_API_KEY
+- Google Calendar credentials (optional)
+- Email service credentials (optional)
 
-# Start the backend server
+Start the backend server
 python main.py
 \`\`\`
 
 ### 3. Frontend Setup
 
-\`\`\`bash
-# Install dependencies (automatically handled by v0)
-# Start the development server (automatically handled by v0)
+
+Install dependencies (automatically handled by v0)
+Start the development server (automatically handled by v0)
 \`\`\`
 
 ### 4. Test the System
 
-\`\`\`bash
-# Run comprehensive tests
+
+Run comprehensive tests
 python scripts/test_complete_system.py
 
-# Test individual components
+Test individual components
 python scripts/test_agent.py
 python scripts/test_mcp_tools.py
-\`\`\`
+
 
 ## 🧪 Testing
 
@@ -135,9 +119,9 @@ python scripts/test_mcp_tools.py
 
 Run the comprehensive test suite:
 
-\`\`\`bash
+bash
 python scripts/test_complete_system.py
-\`\`\`
+
 
 This tests:
 - Database connectivity and models
@@ -230,7 +214,7 @@ ws.onmessage = (event) => {
 
 ### Environment Variables
 
-\`\`\`env
+env
 # Database
 DATABASE_URL=postgresql://user:password@localhost/doctor_appointments
 
@@ -252,13 +236,13 @@ SMTP_PASSWORD=your-app-password
 DEBUG=true
 SESSION_TIMEOUT_MINUTES=30
 ALLOWED_ORIGINS=["http://localhost:3000"]
-\`\`\`
+
 
 ## 🏥 Usage Examples
 
 ### Patient Interactions
 
-\`\`\`
+
 Patient: "I need to see Dr. Johnson next week for a headache"
 AI: "I'll check Dr. Johnson's availability next week for you."
     [Executes: check_doctor_availability]
@@ -272,11 +256,11 @@ Patient: "Monday 2 PM works"
 AI: "Perfect! I'll schedule your appointment with Dr. Johnson for Monday at 2:00 PM."
     [Executes: schedule_appointment]
     "✅ Appointment confirmed! You'll receive an email confirmation shortly."
-\`\`\`
+
 
 ### Doctor Interactions
 
-\`\`\`
+
 Doctor: "Show me my schedule for today"
 AI: [Executes: get_doctor_schedule]
     "Here's your schedule for today:
@@ -288,7 +272,7 @@ AI: [Executes: get_doctor_schedule]
 Doctor: "How many patients with fever did I see this month?"
 AI: [Executes: search_patients_by_symptom]
     "You saw 12 patients with fever this month. Would you like to see the detailed list?"
-\`\`\`
+
 
 ## 🔔 Notification System
 
@@ -315,17 +299,7 @@ AI: [Executes: search_patients_by_symptom]
 4. **Environment**: Set production environment variables
 5. **SSL**: Enable HTTPS for WebSocket connections
 
-### Docker Deployment (Optional)
 
-\`\`\`dockerfile
-# Backend Dockerfile
-FROM python:3.9-slim
-WORKDIR /app
-COPY requirements.txt .
-RUN pip install -r requirements.txt
-COPY . .
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
-\`\`\`
 
 ## 🤝 Contributing
 
@@ -338,6 +312,7 @@ CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
 ## 📄 License
 
 This project is licensed under the MIT License.
+Made by Aman Rathour @ 2025
 
 ## 🆘 Support
 
@@ -360,9 +335,8 @@ For issues and questions:
 ### Debug Mode
 
 Enable debug logging:
-\`\`\`python
+python
 import logging
 logging.basicConfig(level=logging.DEBUG)
-\`\`\`
 
 This comprehensive system demonstrates advanced agentic AI capabilities with real-world medical appointment scheduling functionality.
