@@ -46,13 +46,14 @@ export default function ChatInterface({ userRole }: ChatInterfaceProps) {
   useEffect(() => {
     const initSession = async () => {
       try {
-        const response = await fetch("http://localhost:8000/session/create", {
+        const response = await fetch("/api/session/create", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ user_type: userRole }),
         })
         const data = await response.json()
         setSessionId(data.session_id)
+        console.log("[v0] Session created:", data.session_id)
       } catch (error) {
         console.error("Failed to create session:", error)
       }
@@ -82,7 +83,7 @@ export default function ChatInterface({ userRole }: ChatInterfaceProps) {
     setIsLoading(true)
 
     try {
-      const response = await fetch("http://localhost:8000/chat", {
+      const response = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -93,6 +94,7 @@ export default function ChatInterface({ userRole }: ChatInterfaceProps) {
       })
 
       const data = await response.json()
+      console.log("[v0] Chat response received:", data)
 
       const assistantMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
@@ -108,7 +110,7 @@ export default function ChatInterface({ userRole }: ChatInterfaceProps) {
       const errorMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
         role: "assistant",
-        content: "I apologize, but I encountered an error. Please try again or check if the backend server is running.",
+        content: "I apologize, but I encountered an error. Please try again.",
         timestamp: new Date(),
       }
       setMessages((prev) => [...prev, errorMessage])
