@@ -29,63 +29,12 @@ export function NotificationPanel({ doctorId, className }: NotificationPanelProp
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [isOpen, setIsOpen] = useState(false)
   const [unreadCount, setUnreadCount] = useState(0)
-  const [ws, setWs] = useState<WebSocket | null>(null)
 
-  // Connect to WebSocket for real-time notifications
-  useEffect(() => {
-    const connectWebSocket = () => {
-      const websocket = new WebSocket(`ws://localhost:8000/ws/notifications/${doctorId}`)
-
-      websocket.onopen = () => {
-        console.log("[v0] Connected to notification WebSocket")
-        setWs(websocket)
-      }
-
-      websocket.onmessage = (event) => {
-        const notification: Notification = JSON.parse(event.data)
-        console.log("[v0] Received notification:", notification)
-
-        setNotifications((prev) => [notification, ...prev])
-        setUnreadCount((prev) => prev + 1)
-
-        // Show browser notification if permission granted
-        if (Notification.permission === "granted") {
-          new Notification(notification.title, {
-            body: notification.message,
-            icon: "/favicon.ico",
-          })
-        }
-      }
-
-      websocket.onclose = () => {
-        console.log("[v0] WebSocket connection closed, attempting to reconnect...")
-        setTimeout(connectWebSocket, 3000)
-      }
-
-      websocket.onerror = (error) => {
-        console.error("[v0] WebSocket error:", error)
-      }
-    }
-
-    connectWebSocket()
-
-    // Request notification permission
-    if (Notification.permission === "default") {
-      Notification.requestPermission()
-    }
-
-    return () => {
-      if (ws) {
-        ws.close()
-      }
-    }
-  }, [doctorId])
-
-  // Load existing notifications
+  // Load existing notifications and set up polling
   useEffect(() => {
     const loadNotifications = async () => {
       try {
-        const response = await fetch(`http://localhost:8000/notifications/${doctorId}`)
+        const response = await fetch(`/api/notifications/${doctorId}`)
         const data = await response.json()
 
         if (data.notifications) {
@@ -98,11 +47,22 @@ export function NotificationPanel({ doctorId, className }: NotificationPanelProp
     }
 
     loadNotifications()
+
+    // Set up polling for new notifications
+    const interval = setInterval(loadNotifications, 30000) // Poll every 30 seconds
+
+    return () => clearInterval(interval)
   }, [doctorId])
+
+  useEffect(() => {
+    if (Notification.permission === "default") {
+      Notification.requestPermission()
+    }
+  }, [])
 
   const markAsRead = async (notificationId: string) => {
     try {
-      await fetch(`http://localhost:8000/notifications/${doctorId}/mark-read`, {
+      await fetch(`/api/notifications/${doctorId}/mark-read`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify([notificationId]),
@@ -120,7 +80,7 @@ export function NotificationPanel({ doctorId, className }: NotificationPanelProp
     if (unreadIds.length === 0) return
 
     try {
-      await fetch(`http://localhost:8000/notifications/${doctorId}/mark-read`, {
+      await fetch(`/api/notifications/${doctorId}/mark-read`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(unreadIds),

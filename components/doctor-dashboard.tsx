@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts"
 import { Calendar, Users, TrendingUp, Clock, Stethoscope, Activity } from "lucide-react"
 import { NotificationPanel } from "./notification-panel"
@@ -51,21 +52,41 @@ export default function DoctorDashboard({ doctorId = 1 }: DoctorDashboardProps) 
     fetchStats()
   }, [])
 
+  const handleTodaySchedule = () => {
+    console.log("[v0] Opening today's schedule")
+    // In a real app, this would navigate to schedule view
+    alert("Opening today's schedule...")
+  }
+
+  const handlePatientSearch = () => {
+    console.log("[v0] Opening patient search")
+    // In a real app, this would open patient search modal
+    alert("Opening patient search by symptoms...")
+  }
+
+  const handleMonthlyReport = () => {
+    console.log("[v0] Generating monthly report")
+    // In a real app, this would generate and download report
+    alert("Generating monthly report...")
+  }
+
   if (isLoading) {
     return (
       <div className="space-y-6">
         <div className="flex justify-between items-center">
-          <h1 className="text-2xl font-bold">Doctor Dashboard</h1>
+          <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+            Doctor Dashboard
+          </h1>
           <NotificationPanel doctorId={doctorId} />
         </div>
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
           {[1, 2, 3, 4].map((i) => (
-            <Card key={i} className="animate-pulse">
+            <Card key={i} className="animate-pulse bg-gradient-to-br from-blue-50 to-purple-50 border-blue-200">
               <CardHeader>
-                <div className="h-4 bg-muted rounded w-3/4"></div>
+                <div className="h-4 bg-gradient-to-r from-blue-200 to-purple-200 rounded w-3/4"></div>
               </CardHeader>
               <CardContent>
-                <div className="h-8 bg-muted rounded w-1/2"></div>
+                <div className="h-8 bg-gradient-to-r from-blue-200 to-purple-200 rounded w-1/2"></div>
               </CardContent>
             </Card>
           ))}
@@ -94,56 +115,58 @@ export default function DoctorDashboard({ doctorId = 1 }: DoctorDashboardProps) 
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold">Doctor Dashboard</h1>
-          <p className="text-muted-foreground">Monitor your appointments and patient statistics</p>
+          <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+            Doctor Dashboard
+          </h1>
+          <p className="text-slate-600 mt-1">Monitor your appointments and patient statistics</p>
         </div>
         <NotificationPanel doctorId={doctorId} />
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
+        <Card className="bg-gradient-to-br from-blue-50 to-indigo-100 border-blue-200 hover:shadow-lg transition-all duration-300 hover:scale-105">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Appointments</CardTitle>
-            <Calendar className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium text-blue-800">Total Appointments</CardTitle>
+            <Calendar className="h-5 w-5 text-blue-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats?.total_appointments || 0}</div>
-            <p className="text-xs text-muted-foreground">This week</p>
+            <div className="text-2xl font-bold text-blue-700">{stats?.total_appointments || 0}</div>
+            <p className="text-xs text-blue-600">This week</p>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="bg-gradient-to-br from-purple-50 to-pink-100 border-purple-200 hover:shadow-lg transition-all duration-300 hover:scale-105">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Scheduled</CardTitle>
-            <Clock className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium text-purple-800">Scheduled</CardTitle>
+            <Clock className="h-5 w-5 text-purple-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-secondary">{stats?.scheduled || 0}</div>
-            <p className="text-xs text-muted-foreground">Upcoming appointments</p>
+            <div className="text-2xl font-bold text-purple-700">{stats?.scheduled || 0}</div>
+            <p className="text-xs text-purple-600">Upcoming appointments</p>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="bg-gradient-to-br from-emerald-50 to-teal-100 border-emerald-200 hover:shadow-lg transition-all duration-300 hover:scale-105">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Completed</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium text-emerald-800">Completed</CardTitle>
+            <Users className="h-5 w-5 text-emerald-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">{stats?.completed || 0}</div>
-            <p className="text-xs text-muted-foreground">Patients seen</p>
+            <div className="text-2xl font-bold text-emerald-700">{stats?.completed || 0}</div>
+            <p className="text-xs text-emerald-600">Patients seen</p>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="bg-gradient-to-br from-orange-50 to-red-100 border-orange-200 hover:shadow-lg transition-all duration-300 hover:scale-105">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Completion Rate</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium text-orange-800">Completion Rate</CardTitle>
+            <TrendingUp className="h-5 w-5 text-orange-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
+            <div className="text-2xl font-bold text-orange-700">
               {stats?.total_appointments ? Math.round((stats.completed / stats.total_appointments) * 100) : 0}%
             </div>
-            <p className="text-xs text-muted-foreground">Success rate</p>
+            <p className="text-xs text-orange-600">Success rate</p>
           </CardContent>
         </Card>
       </div>
@@ -224,34 +247,43 @@ export default function DoctorDashboard({ doctorId = 1 }: DoctorDashboardProps) 
         </Card>
       </div>
 
-      <Card>
+      <Card className="bg-gradient-to-br from-slate-50 to-blue-50 border-slate-200">
         <CardHeader>
-          <CardTitle>Quick Actions</CardTitle>
-          <CardDescription>Common tasks and reports</CardDescription>
+          <CardTitle className="text-slate-800">Quick Actions</CardTitle>
+          <CardDescription className="text-slate-600">Common tasks and reports</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-3 md:grid-cols-3">
-            <div className="flex items-center gap-3 p-3 border border-border rounded-lg hover:bg-muted/50 cursor-pointer transition-colors">
-              <Calendar className="w-5 h-5 text-secondary" />
-              <div>
+          <div className="grid gap-4 md:grid-cols-3">
+            <Button
+              onClick={handleTodaySchedule}
+              className="flex items-center gap-3 p-4 h-auto bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
+            >
+              <Calendar className="w-5 h-5" />
+              <div className="text-left">
                 <p className="font-medium text-sm">Today's Schedule</p>
-                <p className="text-xs text-muted-foreground">View appointments</p>
+                <p className="text-xs opacity-90">View appointments</p>
               </div>
-            </div>
-            <div className="flex items-center gap-3 p-3 border border-border rounded-lg hover:bg-muted/50 cursor-pointer transition-colors">
-              <Users className="w-5 h-5 text-secondary" />
-              <div>
+            </Button>
+            <Button
+              onClick={handlePatientSearch}
+              className="flex items-center gap-3 p-4 h-auto bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
+            >
+              <Users className="w-5 h-5" />
+              <div className="text-left">
                 <p className="font-medium text-sm">Patient Search</p>
-                <p className="text-xs text-muted-foreground">Find by symptoms</p>
+                <p className="text-xs opacity-90">Find by symptoms</p>
               </div>
-            </div>
-            <div className="flex items-center gap-3 p-3 border border-border rounded-lg hover:bg-muted/50 cursor-pointer transition-colors">
-              <TrendingUp className="w-5 h-5 text-secondary" />
-              <div>
+            </Button>
+            <Button
+              onClick={handleMonthlyReport}
+              className="flex items-center gap-3 p-4 h-auto bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
+            >
+              <TrendingUp className="w-5 h-5" />
+              <div className="text-left">
                 <p className="font-medium text-sm">Monthly Report</p>
-                <p className="text-xs text-muted-foreground">Generate summary</p>
+                <p className="text-xs opacity-90">Generate summary</p>
               </div>
-            </div>
+            </Button>
           </div>
         </CardContent>
       </Card>

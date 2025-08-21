@@ -152,14 +152,16 @@ export default function ChatInterface({ userRole }: ChatInterfaceProps) {
         ]
 
   return (
-    <div className="flex flex-col h-[600px] max-w-4xl mx-auto">
-      <Card className="flex-1 flex flex-col">
-        <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <Bot className="w-5 h-5 text-secondary" />
+    <div className="flex flex-col h-[700px] max-w-5xl mx-auto">
+      <Card className="flex-1 flex flex-col bg-gradient-to-br from-white to-gray-50 shadow-xl border-0">
+        <CardHeader className="pb-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-t-lg">
+          <CardTitle className="flex items-center gap-3 text-xl">
+            <div className="flex items-center justify-center w-8 h-8 bg-white/20 rounded-lg">
+              <Bot className="w-5 h-5 text-white" />
+            </div>
             AI Assistant Chat
             {sessionId && (
-              <Badge variant="outline" className="text-xs">
+              <Badge variant="secondary" className="text-xs bg-white/20 text-white border-white/30">
                 Session Active
               </Badge>
             )}
@@ -169,33 +171,43 @@ export default function ChatInterface({ userRole }: ChatInterfaceProps) {
         <CardContent className="flex-1 flex flex-col p-0">
           {/* Messages */}
           <ScrollArea className="flex-1 px-6" ref={scrollAreaRef}>
-            <div className="space-y-4 pb-4">
+            <div className="space-y-6 py-6">
               {messages.map((message) => (
                 <div
                   key={message.id}
-                  className={`flex gap-3 ${message.role === "user" ? "justify-end" : "justify-start"}`}
+                  className={`flex gap-4 ${message.role === "user" ? "justify-end" : "justify-start"}`}
                 >
                   {message.role === "assistant" && (
-                    <div className="flex items-center justify-center w-8 h-8 bg-secondary rounded-full flex-shrink-0 mt-1">
-                      <Bot className="w-4 h-4 text-secondary-foreground" />
+                    <div className="flex items-center justify-center w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex-shrink-0 mt-1 shadow-lg">
+                      <Bot className="w-5 h-5 text-white" />
                     </div>
                   )}
 
-                  <div className={`max-w-[80%] ${message.role === "user" ? "order-1" : ""}`}>
+                  <div className={`max-w-[75%] ${message.role === "user" ? "order-1" : ""}`}>
                     <div
-                      className={`rounded-lg px-4 py-3 ${
-                        message.role === "user" ? "chat-message-user" : "chat-message-assistant"
+                      className={`rounded-2xl px-5 py-4 shadow-md ${
+                        message.role === "user"
+                          ? "bg-gradient-to-r from-blue-500 to-purple-600 text-white ml-auto"
+                          : "bg-white border border-gray-200"
                       }`}
                     >
-                      <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.content}</p>
+                      <p
+                        className={`text-sm leading-relaxed whitespace-pre-wrap ${
+                          message.role === "user" ? "text-white" : "text-gray-800"
+                        }`}
+                      >
+                        {message.content}
+                      </p>
                     </div>
 
-                    {/* Tool calls */}
                     {message.toolCalls && message.toolCalls.length > 0 && (
-                      <div className="mt-2 space-y-2">
+                      <div className="mt-3 space-y-2">
                         {message.toolCalls.map((tool, index) => (
-                          <div key={index} className="tool-call-indicator rounded-md px-3 py-2">
-                            <div className="flex items-center gap-2 text-xs font-medium text-secondary">
+                          <div
+                            key={index}
+                            className="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-lg px-4 py-2"
+                          >
+                            <div className="flex items-center gap-2 text-xs font-medium text-emerald-700">
                               {getToolIcon(tool.function_name)}
                               <span>Used: {tool.function_name.replace("_", " ")}</span>
                             </div>
@@ -204,26 +216,26 @@ export default function ChatInterface({ userRole }: ChatInterfaceProps) {
                       </div>
                     )}
 
-                    <p className="text-xs text-muted-foreground mt-1">{message.timestamp.toLocaleTimeString()}</p>
+                    <p className="text-xs text-gray-500 mt-2">{message.timestamp.toLocaleTimeString()}</p>
                   </div>
 
                   {message.role === "user" && (
-                    <div className="flex items-center justify-center w-8 h-8 bg-primary rounded-full flex-shrink-0 mt-1">
-                      <User className="w-4 h-4 text-primary-foreground" />
+                    <div className="flex items-center justify-center w-10 h-10 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-full flex-shrink-0 mt-1 shadow-lg">
+                      <User className="w-5 h-5 text-white" />
                     </div>
                   )}
                 </div>
               ))}
 
               {isLoading && (
-                <div className="flex gap-3 justify-start">
-                  <div className="flex items-center justify-center w-8 h-8 bg-secondary rounded-full flex-shrink-0">
-                    <Bot className="w-4 h-4 text-secondary-foreground" />
+                <div className="flex gap-4 justify-start">
+                  <div className="flex items-center justify-center w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex-shrink-0 shadow-lg">
+                    <Bot className="w-5 h-5 text-white" />
                   </div>
-                  <div className="chat-message-assistant rounded-lg px-4 py-3">
-                    <div className="flex items-center gap-2">
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      <span className="text-sm">Thinking...</span>
+                  <div className="bg-white border border-gray-200 rounded-2xl px-5 py-4 shadow-md">
+                    <div className="flex items-center gap-3">
+                      <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
+                      <span className="text-sm text-gray-600">Thinking...</span>
                     </div>
                   </div>
                 </div>
@@ -231,17 +243,16 @@ export default function ChatInterface({ userRole }: ChatInterfaceProps) {
             </div>
           </ScrollArea>
 
-          {/* Suggestions */}
           {messages.length === 1 && (
-            <div className="px-6 py-3 border-t border-border">
-              <p className="text-xs text-muted-foreground mb-2">Try asking:</p>
-              <div className="flex flex-wrap gap-2">
+            <div className="px-6 py-4 bg-gradient-to-r from-gray-50 to-blue-50 border-t border-gray-200">
+              <p className="text-sm text-gray-600 mb-3 font-medium">Try asking:</p>
+              <div className="flex flex-wrap gap-3">
                 {suggestions.map((suggestion, index) => (
                   <Button
                     key={index}
                     variant="outline"
                     size="sm"
-                    className="text-xs h-7 bg-transparent"
+                    className="text-sm h-9 bg-white hover:bg-gradient-to-r hover:from-blue-500 hover:to-purple-600 hover:text-white border-gray-300 hover:border-transparent transition-all duration-200 shadow-sm hover:shadow-md"
                     onClick={() => setInputValue(suggestion)}
                   >
                     {suggestion}
@@ -251,19 +262,23 @@ export default function ChatInterface({ userRole }: ChatInterfaceProps) {
             </div>
           )}
 
-          {/* Input */}
-          <div className="p-6 border-t border-border">
-            <div className="flex gap-2">
+          <div className="p-6 bg-gradient-to-r from-gray-50 to-blue-50 border-t border-gray-200">
+            <div className="flex gap-3">
               <Input
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
                 onKeyPress={handleKeyPress}
                 placeholder={`Ask me anything about ${userRole === "patient" ? "appointments and healthcare" : "your practice and patients"}...`}
                 disabled={isLoading}
-                className="flex-1"
+                className="flex-1 border-gray-300 focus:border-blue-500 focus:ring-blue-500 rounded-xl px-4 py-3 text-sm shadow-sm"
               />
-              <Button onClick={handleSendMessage} disabled={!inputValue.trim() || isLoading} size="icon">
-                {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+              <Button
+                onClick={handleSendMessage}
+                disabled={!inputValue.trim() || isLoading}
+                size="icon"
+                className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white rounded-xl w-12 h-12 shadow-lg hover:shadow-xl transition-all duration-200"
+              >
+                {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
               </Button>
             </div>
           </div>
