@@ -6,6 +6,8 @@ A comprehensive full-stack agentic AI system for doctor appointment scheduling a
 
 This system implements a true agentic AI architecture where the LLM autonomously decides which tools to use based on natural language input:
 
+<img width="643" height="418" alt="image" src="https://github.com/user-attachments/assets/61f9fb6d-fbae-476c-ad04-5a6e87085bfd" />
+
 \`\`\`
 ┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
 │   React Frontend │    │  FastAPI Backend │    │   PostgreSQL    │
