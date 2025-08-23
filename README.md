@@ -1,341 +1,198 @@
-# Agentic AI Doctor Appointment System
+# MedAI Doctor Appointment System
 
-A comprehensive full-stack agentic AI system for doctor appointment scheduling and management using MCP (Model Context Protocol), built with FastAPI, React, and OpenAI.
+A modern, AI-powered doctor appointment scheduling system with real Gmail and Google Calendar integration, built using Next.js, FastAPI, and OpenAPI-based tool discovery.
 
-## 🏗️ Architecture Overview
-
-This system implements a true agentic AI architecture where the LLM autonomously decides which tools to use based on natural language input:
-
-
-
-
-<img width="598" height="432" alt="image" src="https://github.com/user-attachments/assets/d7801a65-2c3e-4e25-89b1-4951dcd6e04c" />
-
-
-## 🚀 Key Features
-
-### Agentic AI Capabilities
-- **Natural Language Processing**: Understands complex appointment requests
-- **Autonomous Tool Selection**: LLM decides which MCP tools to use
-- **Multi-turn Conversations**: Maintains context across interactions
-- **Intelligent Suggestions**: Provides helpful next steps and alternatives
+## 🚀 Features
 
 ### Core Functionality
-- **Appointment Scheduling**: AI-powered booking with availability checking
-- **Doctor Management**: Comprehensive doctor profiles and availability
-- **Patient Management**: Patient records and appointment history
-- **Real-time Notifications**: WebSocket-based notifications for doctors
-- **Calendar Integration**: Google Calendar sync for appointments
-- **Email Notifications**: Automated confirmations and reminders
+- **AI-powered chat interface** for natural language appointment scheduling
+- **Real Gmail API integration** for sending appointment confirmations, reminders, and cancellations
+- **Real Google Calendar API integration** for creating, updating, and managing calendar events
+- **OpenAPI-based tool discovery** for AI agents to discover and execute available tools
+- **Session management** for maintaining conversation context
+- **Role-based access** (patient/doctor) with different capabilities
 
-### MCP (Model Context Protocol) Tools
-1. **check_doctor_availability**: Check doctor schedules and available slots
-2. **schedule_appointment**: Book appointments with validation and notifications
-3. **get_appointment_stats**: Generate statistics and reports for doctors
-4. **search_patients_by_symptom**: Find patients by symptoms for analysis
-5. **get_doctor_schedule**: Retrieve doctor schedules for specific date ranges
+### Tool System
+- **Appointment Management**: Schedule, check availability, list doctors
+- **Calendar Integration**: Create, update, cancel calendar events
+- **Email Services**: Send confirmation emails, reminders, notifications
+- **Analytics**: Appointment statistics and reporting
+- **Search**: Patient search by symptoms and other criteria
 
-## 🛠️ Technology Stack
+## 🏗️ Architecture
 
-### Backend
-- **FastAPI**: High-performance Python web framework
-- **SQLAlchemy**: Database ORM with PostgreSQL
-- **OpenAI GPT-4**: LLM for agentic AI capabilities
-- **WebSockets**: Real-time notifications
-- **Google Calendar API**: Calendar integration
-- **SendGrid/SMTP**: Email notifications
+### Frontend (Next.js)
+- **React 19** with TypeScript
+- **Modern UI** with Tailwind CSS
+- **Tool discovery** via OpenAPI schema
+- **Real-time chat** interface with tool execution
 
-### Frontend
-- **Next.js 15**: React framework with App Router
-- **TypeScript**: Type-safe development
-- **Tailwind CSS**: Utility-first styling
-- **shadcn/ui**: Professional UI components
-- **WebSocket Client**: Real-time notification handling
+### Backend (FastAPI)
+- **Python 3.8+** with FastAPI framework
+- **OpenAPI schema** generation for tool discovery
+- **Tool registry** system for managing available tools
+- **Real service integration** with Gmail and Google Calendar APIs
 
-### Database
-- **PostgreSQL**: Primary database
-- **SQLAlchemy Models**: Type-safe database operations
+### Tool Discovery System
+- **No MCP endpoints** - uses standard OpenAPI schema
+- **Tool registry** with automatic schema generation
+- **Handler system** for executing tool logic
+- **Real service integration** for actual functionality
 
-## 📋 Prerequisites
+## 🛠️ Installation
 
-- Python 3.9+
-- Node.js 18+
-- PostgreSQL 12+
-- OpenAI API key
-- Google Calendar API credentials (optional)
-- Email service credentials (optional)
+### Prerequisites
+- Node.js 18+ and pnpm
+- Python 3.8+
+- Google API credentials (for Gmail and Calendar integration)
 
-## 🚀 Quick Start
+### Frontend Setup
+```bash
+# Install dependencies
+pnpm install
 
-### 1. Database Setup
+# Start development server
+pnpm dev
+```
 
-# Run the database setup scripts
-python scripts/01_create_database_schema.sql
-python scripts/02_seed_sample_data.sql
-python scripts/database_models.py
-\`\`\`
+### Backend Setup
+```bash
+# Make startup script executable
+chmod +x start-backend.sh
 
-### 2. Backend Setup
+# Start backend (creates venv and installs dependencies)
+./start-backend.sh
+```
 
-\`\`\`bash
-cd backend
-pip install -r requirements.txt
+### Google API Setup
+1. Create a Google Cloud Project
+2. Enable Gmail API and Google Calendar API
+3. Create OAuth 2.0 credentials
+4. Download `credentials.json` and place in `backend/` directory
+5. First run will create `token.json` files for each service
 
-Copy environment template
-cp .env.example .env
+## 📡 API Endpoints
 
-Edit .env with your credentials:
-- DATABASE_URL
-- OPENAI_API_KEY
-- Google Calendar credentials (optional)
-- Email service credentials (optional)
+### Tool Discovery
+- `GET /tools/openapi` - OpenAPI schema for all tools
+- `GET /tools` - List available tools with filtering
+- `POST /tools/execute` - Execute a specific tool
 
-Start the backend server
-python main.py
-\`\`\`
+### Chat & Sessions
+- `POST /api/chat` - Main chat endpoint with tool integration
+- `POST /api/sessions` - Create new chat session
+- `GET /api/sessions/{session_id}` - Get session information
 
-### 3. Frontend Setup
+### Appointments
+- `POST /api/appointments` - Schedule new appointment
+- `GET /api/doctors/availability` - Check doctor availability
+- `GET /api/doctors` - List available doctors
 
+### Analytics & Search
+- `GET /api/analytics/appointments` - Get appointment statistics
+- `GET /api/search/patients` - Search patients by symptoms
 
-Install dependencies (automatically handled by v0)
-Start the development server (automatically handled by v0)
-\`\`\`
+## 🔧 Available Tools
 
-### 4. Test the System
+### Appointment Tools
+- `schedule_appointment` - Schedule new appointment with calendar and email integration
+- `check_doctor_availability` - Check real-time doctor availability
+- `list_doctors` - List doctors with filtering options
 
+### Calendar Tools
+- `create_calendar_event` - Create Google Calendar events
+- `update_appointment_event` - Update existing calendar events
+- `cancel_appointment_event` - Cancel calendar events
 
-Run comprehensive tests
-python scripts/test_complete_system.py
+### Email Tools
+- `send_appointment_confirmation` - Send confirmation emails via Gmail
+- `send_appointment_reminder` - Send reminder emails
+- `send_cancellation_notification` - Send cancellation notices
 
-Test individual components
-python scripts/test_agent.py
-python scripts/test_mcp_tools.py
+### Analytics Tools
+- `get_appointment_statistics` - Generate appointment reports
+- `search_patients_by_symptoms` - Search patient database
 
+## 💬 Usage Examples
+
+### Scheduling an Appointment
+```
+User: "I'd like to schedule an appointment with Dr. Smith for tomorrow at 2 PM"
+Assistant: "I'll schedule that appointment for you. Let me check availability and create the calendar event..."
+```
+
+### Checking Doctor Availability
+```
+User: "Is Dr. Johnson available next Tuesday?"
+Assistant: "Let me check Dr. Johnson's availability for next Tuesday..."
+```
+
+### Tool Discovery
+The system automatically discovers available tools via the OpenAPI schema at `/tools/openapi`, allowing AI agents to understand what capabilities are available.
+
+## 🔒 Security & Authentication
+
+- **OAuth 2.0** for Google API integration
+- **Session-based** authentication for chat
+- **Role-based** access control
+- **Secure token storage** for API credentials
 
 ## 🧪 Testing
 
-### Automated Tests
+### Backend Health Check
+```bash
+curl http://localhost:8000/health
+```
 
-Run the comprehensive test suite:
+### Tool Discovery
+```bash
+curl http://localhost:8000/tools/openapi
+```
 
-bash
-python scripts/test_complete_system.py
+### Tool Execution
+```bash
+curl -X POST http://localhost:8000/tools/execute \
+  -H "Content-Type: application/json" \
+  -d '{"tool_name": "list_doctors", "parameters": {}}'
+```
 
+## 🚨 Troubleshooting
 
-This tests:
-- Database connectivity and models
-- MCP tool functionality
-- LLM agent responses
-- API endpoints
-- WebSocket notifications
-- External API integrations
+### Common Issues
+1. **Google API errors**: Check credentials.json and token.json files
+2. **Tool discovery fails**: Verify backend is running and accessible
+3. **Frontend build errors**: Clear node_modules and reinstall dependencies
 
-### Manual Testing
+### Logs
+- Backend logs are displayed in the terminal
+- Frontend errors appear in browser console
+- Tool execution results are logged for debugging
 
-1. **Patient Flow**:
-   - Select "I'm a Patient" role
-   - Ask: "I want to book an appointment with Dr. Smith tomorrow morning"
-   - Verify AI checks availability and schedules appointment
+## 🔄 Development
 
-2. **Doctor Flow**:
-   - Select "I'm a Doctor" role
-   - Ask: "Show me my appointments for this week"
-   - Verify statistics and schedule display
+### Adding New Tools
+1. Define tool in `backend/tool_registry.py`
+2. Implement handler in `backend/tool_handlers.py`
+3. Register handler in `ToolHandlers._register_handlers()`
+4. Tool automatically appears in OpenAPI schema
 
-3. **Notifications**:
-   - Book an appointment
-   - Verify real-time notification appears for doctor
-   - Check email confirmations sent
+### Modifying Existing Tools
+- Update tool definition in registry
+- Modify handler implementation
+- Update frontend tool client if needed
 
-## 📖 API Documentation
+## 📝 License
 
-### Core Endpoints
-
-#### Chat Endpoint
-\`\`\`http
-POST /chat
-Content-Type: application/json
-
-{
-  "message": "I want to book an appointment with Dr. Smith tomorrow at 2 PM",
-  "session_id": "optional-session-id",
-  "user_type": "patient"
-}
-\`\`\`
-
-#### MCP Tool Execution
-\`\`\`http
-POST /mcp/execute
-Content-Type: application/json
-
-{
-  "tool_name": "check_doctor_availability",
-  "parameters": {
-    "doctor_name": "Dr. Smith",
-    "date": "2024-01-15",
-    "time_preference": "afternoon"
-  }
-}
-\`\`\`
-
-#### WebSocket Notifications
-\`\`\`javascript
-const ws = new WebSocket('ws://localhost:8000/ws/notifications/1');
-ws.onmessage = (event) => {
-  const notification = JSON.parse(event.data);
-  console.log('New notification:', notification);
-};
-\`\`\`
-
-### Available MCP Tools
-
-1. **check_doctor_availability**
-   - Parameters: `doctor_name`, `date`, `time_preference`
-   - Returns: Available time slots
-
-2. **schedule_appointment**
-   - Parameters: `doctor_name`, `patient_name`, `patient_email`, `appointment_date`, `appointment_time`, `symptoms`
-   - Returns: Appointment confirmation with calendar/email integration
-
-3. **get_appointment_stats**
-   - Parameters: `doctor_name`, `date_range`, `filter_by`
-   - Returns: Statistical analysis of appointments
-
-4. **search_patients_by_symptom**
-   - Parameters: `symptom`, `doctor_name`, `date_range`
-   - Returns: Patients matching symptom criteria
-
-5. **get_doctor_schedule**
-   - Parameters: `doctor_name`, `start_date`, `end_date`
-   - Returns: Complete doctor schedule
-
-## 🔧 Configuration
-
-### Environment Variables
-
-env
-# Database
-DATABASE_URL=postgresql://user:password@localhost/doctor_appointments
-
-# OpenAI
-OPENAI_API_KEY=your-openai-api-key
-
-# Google Calendar (Optional)
-GOOGLE_CALENDAR_CREDENTIALS_FILE=path/to/credentials.json
-GOOGLE_CALENDAR_TOKEN_FILE=path/to/token.json
-
-# Email Service (Optional)
-SENDGRID_API_KEY=your-sendgrid-key
-SMTP_SERVER=smtp.gmail.com
-SMTP_PORT=587
-SMTP_USERNAME=your-email@gmail.com
-SMTP_PASSWORD=your-app-password
-
-# Application
-DEBUG=true
-SESSION_TIMEOUT_MINUTES=30
-ALLOWED_ORIGINS=["http://localhost:3000"]
-
-
-## 🏥 Usage Examples
-
-### Patient Interactions
-
-
-Patient: "I need to see Dr. Johnson next week for a headache"
-AI: "I'll check Dr. Johnson's availability next week for you."
-    [Executes: check_doctor_availability]
-    "Dr. Johnson has these available slots next week:
-    - Monday 2:00 PM
-    - Wednesday 10:30 AM
-    - Friday 3:00 PM
-    Which time works best for you?"
-
-Patient: "Monday 2 PM works"
-AI: "Perfect! I'll schedule your appointment with Dr. Johnson for Monday at 2:00 PM."
-    [Executes: schedule_appointment]
-    "✅ Appointment confirmed! You'll receive an email confirmation shortly."
-
-
-### Doctor Interactions
-
-
-Doctor: "Show me my schedule for today"
-AI: [Executes: get_doctor_schedule]
-    "Here's your schedule for today:
-    - 9:00 AM: Sarah Wilson (routine checkup)
-    - 10:30 AM: Mike Chen (follow-up)
-    - 2:00 PM: Lisa Brown (headache)
-    You have 3 appointments scheduled."
-
-Doctor: "How many patients with fever did I see this month?"
-AI: [Executes: search_patients_by_symptom]
-    "You saw 12 patients with fever this month. Would you like to see the detailed list?"
-
-
-## 🔔 Notification System
-
-### Real-time Notifications
-- **New Appointments**: Instant alerts when patients book
-- **Cancellations**: Immediate notification of cancelled appointments
-- **Reminders**: 30-minute appointment reminders
-- **System Alerts**: Important system notifications
-
-### Notification Types
-- `new_appointment`: High priority, includes patient details
-- `appointment_cancelled`: Medium priority, includes cancellation details
-- `appointment_reminder`: High priority, includes timing information
-- `patient_message`: Medium priority, includes message content
-- `system_alert`: Variable priority, includes system information
-
-## 🚀 Deployment
-
-### Production Setup
-
-1. **Database**: Use managed PostgreSQL (AWS RDS, Google Cloud SQL)
-2. **Backend**: Deploy FastAPI with Gunicorn/Uvicorn
-3. **Frontend**: Deploy Next.js to Vercel or similar platform
-4. **Environment**: Set production environment variables
-5. **SSL**: Enable HTTPS for WebSocket connections
-
-
+This project is licensed under the MIT License.
 
 ## 🤝 Contributing
 
 1. Fork the repository
 2. Create a feature branch
 3. Make your changes
-4. Add tests for new functionality
+4. Test thoroughly
 5. Submit a pull request
 
-## 📄 License
+## 📞 Support
 
-This project is licensed under the MIT License.
-Made by Aman Rathour @ 2025
-
-## 🆘 Support
-
-For issues and questions:
-1. Check the troubleshooting section
-2. Review the API documentation
-3. Run the test suite to identify issues
-4. Check logs for detailed error information
-
-## 🔍 Troubleshooting
-
-### Common Issues
-
-1. **Database Connection**: Verify PostgreSQL is running and credentials are correct
-2. **OpenAI API**: Ensure API key is valid and has sufficient credits
-3. **WebSocket Issues**: Check CORS settings and firewall rules
-4. **Email Not Sending**: Verify SMTP credentials and settings
-5. **Calendar Integration**: Check Google API credentials and permissions
-
-### Debug Mode
-
-Enable debug logging:
-python
-import logging
-logging.basicConfig(level=logging.DEBUG)
-
-This comprehensive system demonstrates advanced agentic AI capabilities with real-world medical appointment scheduling functionality.
+For support and questions, please open an issue in the repository.
