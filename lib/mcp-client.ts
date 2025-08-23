@@ -48,8 +48,14 @@ export class MCPClient {
   private sessionId: string | null = null
   private requestId: number = 0
 
-  constructor(baseUrl: string = 'http://localhost:8000') {
-    this.baseUrl = baseUrl
+  constructor(baseUrl?: string) {
+    // Use environment variable or fallback to localhost for development
+    this.baseUrl = baseUrl || process.env.NEXT_PUBLIC_MCP_SERVER_URL || 'http://localhost:8000'
+    
+    // In production, ensure we're using HTTPS
+    if (typeof window !== 'undefined' && window.location.protocol === 'https:' && this.baseUrl.startsWith('http:')) {
+      this.baseUrl = this.baseUrl.replace('http:', 'https:')
+    }
   }
 
   setSessionId(sessionId: string) {
@@ -72,7 +78,8 @@ export class MCPClient {
       return await response.json()
     } catch (error) {
       console.error('Error discovering MCP tools:', error)
-      throw error
+      // Return empty tools array instead of throwing to prevent frontend crashes
+      return { tools: [] }
     }
   }
 
@@ -157,47 +164,52 @@ export class MCPClient {
    */
   async executeToolWebSocket(toolName: string, args: Record<string, any>): Promise<MCPToolResult> {
     return new Promise((resolve, reject) => {
-      const ws = new WebSocket(`ws://${this.baseUrl.replace('http://', '')}/mcp/ws`)
-      
-      ws.onopen = () => {
-        const request: MCPRequest = {
-          jsonrpc: "2.0",
-          id: this.generateId(),
-          method: "tools/call",
-          params: {
-            name: toolName,
-            arguments: args
+      try {
+        const wsUrl = this.baseUrl.replace(/^https?:\/\//, 'wss://')
+        const ws = new WebSocket(`${wsUrl}/mcp/ws`)
+        
+        ws.onopen = () => {
+          const request: MCPRequest = {
+            jsonrpc: "2.0",
+            id: this.generateId(),
+            method: "tools/call",
+            params: {
+              name: toolName,
+              arguments: args
+            }
+          }
+          ws.send(JSON.stringify(request))
+        }
+
+        ws.onmessage = (event) => {
+          try {
+            const response: MCPResponse = JSON.parse(event.data)
+            ws.close()
+            
+            if (response.error) {
+              reject(new Error(response.error.message))
+            } else {
+              resolve(response.result)
+            }
+          } catch (error) {
+            ws.close()
+            reject(error)
           }
         }
-        ws.send(JSON.stringify(request))
-      }
 
-      ws.onmessage = (event) => {
-        try {
-          const response: MCPResponse = JSON.parse(event.data)
-          ws.close()
-          
-          if (response.error) {
-            reject(new Error(response.error.message))
-          } else {
-            resolve(response.result)
-          }
-        } catch (error) {
+        ws.onerror = (error) => {
           ws.close()
           reject(error)
         }
-      }
 
-      ws.onerror = (error) => {
-        ws.close()
+        // Timeout after 10 seconds
+        setTimeout(() => {
+          ws.close()
+          reject(new Error('WebSocket timeout'))
+        }, 10000)
+      } catch (error) {
         reject(error)
       }
-
-      // Timeout after 10 seconds
-      setTimeout(() => {
-        ws.close()
-        reject(new Error('WebSocket timeout'))
-      }, 10000)
     })
   }
 
@@ -209,6 +221,7 @@ export class MCPClient {
       const response = await fetch(`${this.baseUrl}/mcp`)
       return response.ok
     } catch (error) {
+      console.warn('MCP server health check failed:', error)
       return false
     }
   }
@@ -231,7 +244,7 @@ export class MCPClient {
   }
 }
 
-// Export singleton instance
+// Export singleton instance with dynamic URL
 export const mcpClient = new MCPClient()
 
 // Export specific tool execution functions for common operations

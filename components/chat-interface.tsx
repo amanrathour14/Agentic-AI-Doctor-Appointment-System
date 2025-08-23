@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
-import { Send, Bot, User, Loader2, Calendar, Stethoscope, BarChart3, Wrench, Tool } from "lucide-react"
+import { Send, Bot, User, Loader2, Calendar, Stethoscope, BarChart3, Wrench, Tool, AlertCircle } from "lucide-react"
 import { mcpClient, appointmentTools, doctorTools, searchTools } from "@/lib/mcp-client"
 
 interface ChatMessage {
@@ -35,6 +35,7 @@ export default function ChatInterface({ userRole = "patient" }: { userRole?: str
   const [availableTools, setAvailableTools] = useState<MCPTool[]>([])
   const [showTools, setShowTools] = useState(false)
   const [mcpStatus, setMcpStatus] = useState<string>("checking")
+  const [mcpError, setMcpError] = useState<string>("")
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   const scrollToBottom = () => {
@@ -60,21 +61,35 @@ export default function ChatInterface({ userRole = "patient" }: { userRole?: str
           setSessionId(data.session_id)
           mcpClient.setSessionId(data.session_id)
           
-          // Check MCP server status
-          const mcpHealthy = await mcpClient.healthCheck()
-          if (mcpHealthy) {
-            setMcpStatus("connected")
-            // Discover available MCP tools
-            try {
-              const toolsInfo = await mcpClient.discoverTools()
-              setAvailableTools(toolsInfo.tools)
-              console.log("MCP tools discovered:", toolsInfo.tools)
-            } catch (error) {
-              console.warn("MCP tool discovery failed:", error)
-              setMcpStatus("tools_failed")
+          // Check MCP server status with timeout
+          try {
+            const mcpHealthy = await Promise.race([
+              mcpClient.healthCheck(),
+              new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 5000))
+            ])
+            
+            if (mcpHealthy) {
+              setMcpStatus("connected")
+              setMcpError("")
+              
+              // Discover available MCP tools
+              try {
+                const toolsInfo = await mcpClient.discoverTools()
+                setAvailableTools(toolsInfo.tools)
+                console.log("MCP tools discovered:", toolsInfo.tools)
+              } catch (error) {
+                console.warn("MCP tool discovery failed:", error)
+                setMcpStatus("tools_failed")
+                setMcpError("Tool discovery failed, but basic chat is available")
+              }
+            } else {
+              setMcpStatus("disconnected")
+              setMcpError("MCP server not responding")
             }
-          } else {
+          } catch (error) {
+            console.warn("MCP health check failed:", error)
             setMcpStatus("disconnected")
+            setMcpError("Cannot connect to MCP server")
           }
           
           // Add welcome message
@@ -95,6 +110,8 @@ export default function ChatInterface({ userRole = "patient" }: { userRole?: str
         }
       } catch (error) {
         console.error("Error initializing chat:", error)
+        setMcpStatus("error")
+        setMcpError("Failed to initialize chat session")
         setMessages([
           {
             id: "error",
@@ -124,36 +141,40 @@ export default function ChatInterface({ userRole = "patient" }: { userRole?: str
     setIsLoading(true)
 
     try {
-      // Try to process with MCP tools first
-      const mcpResponse = await processMessageWithMCP(inputValue, userRole)
-      
-      if (mcpResponse) {
-        setMessages(prev => [...prev, mcpResponse])
-      } else {
-        // Fallback to regular chat
-        const response = await fetch("/api/chat", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            message: inputValue,
-            session_id: sessionId,
-            user_role: userRole
-          })
-        })
-
-        if (response.ok) {
-          const data = await response.json()
-          const assistantMessage: ChatMessage = {
-            id: (Date.now() + 1).toString(),
-            role: "assistant",
-            content: data.response,
-            timestamp: new Date(),
-            toolCalls: data.tool_calls
-          }
-          setMessages(prev => [...prev, assistantMessage])
-        } else {
-          throw new Error("Failed to get response")
+      // Only try MCP tools if server is connected
+      if (mcpStatus === "connected") {
+        const mcpResponse = await processMessageWithMCP(inputValue, userRole)
+        
+        if (mcpResponse) {
+          setMessages(prev => [...prev, mcpResponse])
+          setIsLoading(false)
+          return
         }
+      }
+      
+      // Fallback to regular chat
+      const response = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: inputValue,
+          session_id: sessionId,
+          user_role: userRole
+        })
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        const assistantMessage: ChatMessage = {
+          id: (Date.now() + 1).toString(),
+          role: "assistant",
+          content: data.response,
+          timestamp: new Date(),
+          toolCalls: data.tool_calls
+        }
+        setMessages(prev => [...prev, assistantMessage])
+      } else {
+        throw new Error("Failed to get response")
       }
     } catch (error) {
       console.error("Error processing message:", error)
@@ -170,6 +191,10 @@ export default function ChatInterface({ userRole = "patient" }: { userRole?: str
   }
 
   const processMessageWithMCP = async (message: string, role: string): Promise<ChatMessage | null> => {
+    if (mcpStatus !== "connected") {
+      return null
+    }
+
     const lowerMessage = message.toLowerCase()
     
     // Check for appointment scheduling
@@ -267,6 +292,7 @@ export default function ChatInterface({ userRole = "patient" }: { userRole?: str
       case "connected": return "bg-green-500"
       case "disconnected": return "bg-red-500"
       case "tools_failed": return "bg-yellow-500"
+      case "error": return "bg-red-600"
       default: return "bg-gray-500"
     }
   }
@@ -276,7 +302,28 @@ export default function ChatInterface({ userRole = "patient" }: { userRole?: str
       case "connected": return "MCP Connected"
       case "disconnected": return "MCP Disconnected"
       case "tools_failed": return "MCP Tools Failed"
+      case "error": return "MCP Error"
       default: return "Checking MCP..."
+    }
+  }
+
+  const retryMCPConnection = async () => {
+    setMcpStatus("checking")
+    setMcpError("")
+    
+    try {
+      const mcpHealthy = await mcpClient.healthCheck()
+      if (mcpHealthy) {
+        setMcpStatus("connected")
+        const toolsInfo = await mcpClient.discoverTools()
+        setAvailableTools(toolsInfo.tools)
+      } else {
+        setMcpStatus("disconnected")
+        setMcpError("MCP server not responding")
+      }
+    } catch (error) {
+      setMcpStatus("error")
+      setMcpError("Connection failed")
     }
   }
 
@@ -297,8 +344,19 @@ export default function ChatInterface({ userRole = "patient" }: { userRole?: str
           
           <div className="flex items-center space-x-2">
             {/* MCP Status Indicator */}
-            <div className={`px-3 py-2 rounded-lg text-white text-sm ${getMCPStatusColor()}`}>
-              {getMCPStatusText()}
+            <div className="flex items-center space-x-2">
+              <div className={`px-3 py-2 rounded-lg text-white text-sm ${getMCPStatusColor()}`}>
+                {getMCPStatusText()}
+              </div>
+              
+              {mcpStatus === "disconnected" && (
+                <button
+                  onClick={retryMCPConnection}
+                  className="px-2 py-1 text-xs bg-blue-500 hover:bg-blue-600 text-white rounded transition-colors"
+                >
+                  Retry
+                </button>
+              )}
             </div>
             
             <button
@@ -310,26 +368,44 @@ export default function ChatInterface({ userRole = "patient" }: { userRole?: str
             </button>
           </div>
         </div>
+        
+        {/* MCP Error Display */}
+        {mcpError && (
+          <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+            <div className="flex items-center space-x-2">
+              <AlertCircle className="w-4 h-4 text-yellow-600" />
+              <span className="text-sm text-yellow-800">
+                {mcpError}. Basic chat functionality is still available.
+              </span>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Tools Panel */}
       {showTools && (
         <div className="bg-gray-50 border-b border-gray-200 p-4">
           <h3 className="text-sm font-medium text-gray-700 mb-3">Available MCP Tools</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-            {availableTools.map((tool) => (
-              <div key={tool.name} className="bg-white p-3 rounded-lg border border-gray-200">
-                <div className="flex items-center space-x-2 mb-2">
-                  <Wrench className="w-4 h-4 text-blue-600" />
-                  <span className="font-medium text-sm">{tool.name}</span>
+          {availableTools.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              {availableTools.map((tool) => (
+                <div key={tool.name} className="bg-white p-3 rounded-lg border border-gray-200">
+                  <div className="flex items-center space-x-2 mb-2">
+                    <Wrench className="w-4 h-4 text-blue-600" />
+                    <span className="font-medium text-sm">{tool.name}</span>
+                  </div>
+                  <p className="text-xs text-gray-600 mb-2">{tool.description}</p>
+                  <div className="text-xs text-gray-500">
+                    <strong>Parameters:</strong> {Object.keys(tool.inputSchema.properties || {}).join(", ")}
+                  </div>
                 </div>
-                <p className="text-xs text-gray-600 mb-2">{tool.description}</p>
-                <div className="text-xs text-gray-500">
-                  <strong>Parameters:</strong> {Object.keys(tool.inputSchema.properties || {}).join(", ")}
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-4 text-gray-500">
+              {mcpStatus === "connected" ? "No tools available" : "Tools not loaded - check MCP connection"}
+            </div>
+          )}
         </div>
       )}
 

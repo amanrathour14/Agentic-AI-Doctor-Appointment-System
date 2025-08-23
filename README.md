@@ -1,198 +1,259 @@
-# MedAI Doctor Appointment System
+# MedAI - AI-Powered Doctor Appointment System
 
-A modern, AI-powered doctor appointment scheduling system with real Gmail and Google Calendar integration, built using Next.js, FastAPI, and OpenAPI-based tool discovery.
-
-## 🚀 Features
-
-### Core Functionality
-- **AI-powered chat interface** for natural language appointment scheduling
-- **Real Gmail API integration** for sending appointment confirmations, reminders, and cancellations
-- **Real Google Calendar API integration** for creating, updating, and managing calendar events
-- **OpenAPI-based tool discovery** for AI agents to discover and execute available tools
-- **Session management** for maintaining conversation context
-- **Role-based access** (patient/doctor) with different capabilities
-
-### Tool System
-- **Appointment Management**: Schedule, check availability, list doctors
-- **Calendar Integration**: Create, update, cancel calendar events
-- **Email Services**: Send confirmation emails, reminders, notifications
-- **Analytics**: Appointment statistics and reporting
-- **Search**: Patient search by symptoms and other criteria
+A comprehensive healthcare appointment management system with MCP (Model Context Protocol) integration, real Gmail API, and Google Calendar API support.
 
 ## 🏗️ Architecture
 
-### Frontend (Next.js)
-- **React 19** with TypeScript
-- **Modern UI** with Tailwind CSS
-- **Tool discovery** via OpenAPI schema
-- **Real-time chat** interface with tool execution
+### MCP (Model Context Protocol) Implementation
+- **FastAPI MCP Server**: Implements MCP standard with tool discovery and execution
+- **Tool Registry**: OpenAPI-compliant tool definitions for AI agent discovery
+- **Real Service Integration**: Gmail API (OAuth2) and Google Calendar API (OAuth2)
+- **WebSocket Support**: Real-time communication for tool execution
 
-### Backend (FastAPI)
-- **Python 3.8+** with FastAPI framework
-- **OpenAPI schema** generation for tool discovery
-- **Tool registry** system for managing available tools
-- **Real service integration** with Gmail and Google Calendar APIs
+### Frontend
+- **Next.js 14**: React-based frontend with TypeScript
+- **MCP Client**: TypeScript client for MCP server communication
+- **Real-time Chat**: AI-powered appointment scheduling and management
+- **Responsive UI**: Modern, accessible interface
 
-### Tool Discovery System
-- **No MCP endpoints** - uses standard OpenAPI schema
-- **Tool registry** with automatic schema generation
-- **Handler system** for executing tool logic
-- **Real service integration** for actual functionality
+### Backend Services
+- **FastAPI**: High-performance Python web framework
+- **Gmail Service**: Real email sending via Gmail API
+- **Calendar Service**: Real calendar event management
+- **Session Management**: User session handling
+- **Tool Handlers**: MCP tool implementation
 
-## 🛠️ Installation
+## 🚀 Getting Started
 
 ### Prerequisites
+- Python 3.11+ (3.13 not recommended due to compatibility issues)
 - Node.js 18+ and pnpm
-- Python 3.8+
-- Google API credentials (for Gmail and Calendar integration)
+- Google Cloud Platform account with APIs enabled
+- PostgreSQL (optional, for production)
 
-### Frontend Setup
+### 1. Clone and Setup
 ```bash
-# Install dependencies
-pnpm install
+git clone <your-repo-url>
+cd medai-appointment-system
+```
 
-# Start development server
+### 2. Backend Setup
+```bash
+cd backend
+
+# Create virtual environment
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Set up Google API credentials
+# Download credentials.json from Google Cloud Console
+# Place in backend/ directory
+```
+
+### 3. Frontend Setup
+```bash
+cd ..
+pnpm install
+```
+
+### 4. Environment Configuration
+Create `.env.local` for development:
+```bash
+NEXT_PUBLIC_MCP_SERVER_URL=http://localhost:8000
+NODE_ENV=development
+```
+
+### 5. Start Services
+```bash
+# Terminal 1: Start MCP Server
+./start-mcp-server.sh
+
+# Terminal 2: Start Frontend
 pnpm dev
 ```
 
-### Backend Setup
-```bash
-# Make startup script executable
-chmod +x start-backend.sh
+## 🌐 Deployment
 
-# Start backend (creates venv and installs dependencies)
-./start-backend.sh
-```
+### Vercel Frontend Deployment
 
-### Google API Setup
-1. Create a Google Cloud Project
-2. Enable Gmail API and Google Calendar API
-3. Create OAuth 2.0 credentials
-4. Download `credentials.json` and place in `backend/` directory
-5. First run will create `token.json` files for each service
+1. **Set Environment Variables in Vercel Dashboard:**
+   ```
+   NEXT_PUBLIC_MCP_SERVER_URL=https://your-backend-domain.com
+   ```
 
-## 📡 API Endpoints
+2. **Deploy:**
+   ```bash
+   vercel --prod
+   ```
 
-### Tool Discovery
-- `GET /tools/openapi` - OpenAPI schema for all tools
-- `GET /tools` - List available tools with filtering
-- `POST /tools/execute` - Execute a specific tool
+### Backend Deployment
 
-### Chat & Sessions
-- `POST /api/chat` - Main chat endpoint with tool integration
-- `POST /api/sessions` - Create new chat session
-- `GET /api/sessions/{session_id}` - Get session information
+1. **Deploy to your preferred platform** (Railway, Render, DigitalOcean, etc.)
+2. **Set environment variables:**
+   ```
+   GOOGLE_APPLICATION_CREDENTIALS=path/to/credentials.json
+   DATABASE_URL=your_database_url
+   ```
 
-### Appointments
-- `POST /api/appointments` - Schedule new appointment
-- `GET /api/doctors/availability` - Check doctor availability
-- `GET /api/doctors` - List available doctors
+3. **Update frontend environment variable** with your backend URL
 
-### Analytics & Search
-- `GET /api/analytics/appointments` - Get appointment statistics
-- `GET /api/search/patients` - Search patients by symptoms
+## 🔧 MCP Endpoints
 
-## 🔧 Available Tools
+### HTTP Endpoints
+- `GET /mcp` - Server information and capabilities
+- `GET /mcp/tools` - List available tools
+- `POST /mcp/tools/call` - Execute tool with parameters
 
-### Appointment Tools
-- `schedule_appointment` - Schedule new appointment with calendar and email integration
-- `check_doctor_availability` - Check real-time doctor availability
-- `list_doctors` - List doctors with filtering options
+### WebSocket Endpoint
+- `WS /mcp/ws` - Real-time tool execution
 
-### Calendar Tools
+## 🛠️ Available Tools
+
+### Appointment Management
+- `schedule_appointment` - Book new appointments
+- `check_doctor_availability` - Check doctor schedules
+- `list_doctors` - Get available doctors
+
+### Calendar Integration
 - `create_calendar_event` - Create Google Calendar events
-- `update_appointment_event` - Update existing calendar events
-- `cancel_appointment_event` - Cancel calendar events
+- `update_calendar_event` - Modify existing events
+- `cancel_calendar_event` - Cancel appointments
 
-### Email Tools
-- `send_appointment_confirmation` - Send confirmation emails via Gmail
-- `send_appointment_reminder` - Send reminder emails
+### Email Services
+- `send_appointment_confirmation` - Send booking confirmations
+- `send_appointment_reminder` - Send appointment reminders
 - `send_cancellation_notification` - Send cancellation notices
 
-### Analytics Tools
-- `get_appointment_statistics` - Generate appointment reports
-- `search_patients_by_symptoms` - Search patient database
-
-## 💬 Usage Examples
-
-### Scheduling an Appointment
-```
-User: "I'd like to schedule an appointment with Dr. Smith for tomorrow at 2 PM"
-Assistant: "I'll schedule that appointment for you. Let me check availability and create the calendar event..."
-```
-
-### Checking Doctor Availability
-```
-User: "Is Dr. Johnson available next Tuesday?"
-Assistant: "Let me check Dr. Johnson's availability for next Tuesday..."
-```
-
-### Tool Discovery
-The system automatically discovers available tools via the OpenAPI schema at `/tools/openapi`, allowing AI agents to understand what capabilities are available.
-
-## 🔒 Security & Authentication
-
-- **OAuth 2.0** for Google API integration
-- **Session-based** authentication for chat
-- **Role-based** access control
-- **Secure token storage** for API credentials
+### Analytics & Search
+- `get_appointment_statistics` - Get appointment analytics
+- `search_patients_by_symptoms` - Search patient records
 
 ## 🧪 Testing
 
-### Backend Health Check
+### MCP Server Testing
 ```bash
-curl http://localhost:8000/health
-```
+# Check server status
+curl http://localhost:8000/mcp
 
-### Tool Discovery
-```bash
-curl http://localhost:8000/tools/openapi
-```
+# List available tools
+curl http://localhost:8000/mcp/tools
 
-### Tool Execution
-```bash
-curl -X POST http://localhost:8000/tools/execute \
+# Execute tool
+curl -X POST http://localhost:8000/mcp/tools/call \
   -H "Content-Type: application/json" \
-  -d '{"tool_name": "list_doctors", "parameters": {}}'
+  -d '{"name": "list_doctors", "arguments": {}}'
+```
+
+### Frontend Testing
+1. Open browser to `http://localhost:3000`
+2. Check MCP connection status
+3. Test tool discovery panel
+4. Try appointment scheduling via chat
+
+## 🔐 Google API Setup
+
+### 1. Enable APIs
+- Gmail API
+- Google Calendar API
+- Google+ API
+
+### 2. Create OAuth2 Credentials
+- Download `credentials.json`
+- Place in `backend/` directory
+- First run will create `token.json`
+
+### 3. Grant Permissions
+- Email access for appointment notifications
+- Calendar access for event management
+
+## 📁 Project Structure
+
+```
+├── backend/
+│   ├── mcp_server.py          # MCP server implementation
+│   ├── tool_registry.py       # Tool definitions and registry
+│   ├── gmail_service.py       # Gmail API integration
+│   ├── google_calendar_service.py # Calendar API integration
+│   ├── requirements.txt       # Python dependencies
+│   └── start-mcp-server.sh   # Server startup script
+├── components/
+│   └── chat-interface.tsx    # Main chat interface
+├── lib/
+│   └── mcp-client.ts         # MCP client implementation
+├── app/                      # Next.js app directory
+├── .env.local               # Development environment
+├── .env.production          # Production environment template
+├── vercel.json              # Vercel configuration
+└── README.md                # This file
 ```
 
 ## 🚨 Troubleshooting
 
 ### Common Issues
-1. **Google API errors**: Check credentials.json and token.json files
-2. **Tool discovery fails**: Verify backend is running and accessible
-3. **Frontend build errors**: Clear node_modules and reinstall dependencies
 
-### Logs
-- Backend logs are displayed in the terminal
-- Frontend errors appear in browser console
-- Tool execution results are logged for debugging
+1. **MCP Connection Failed**
+   - Check backend server is running
+   - Verify environment variables
+   - Check firewall/network settings
 
-## 🔄 Development
+2. **Google API Errors**
+   - Verify `credentials.json` exists
+   - Check API quotas and billing
+   - Ensure OAuth2 consent screen is configured
 
-### Adding New Tools
-1. Define tool in `backend/tool_registry.py`
-2. Implement handler in `backend/tool_handlers.py`
-3. Register handler in `ToolHandlers._register_handlers()`
-4. Tool automatically appears in OpenAPI schema
+3. **Frontend Build Errors**
+   - Clear `.next` directory
+   - Run `pnpm install` again
+   - Check Node.js version compatibility
 
-### Modifying Existing Tools
-- Update tool definition in registry
-- Modify handler implementation
-- Update frontend tool client if needed
+4. **Vercel Deployment Issues**
+   - Set environment variables in Vercel dashboard
+   - Check build logs for errors
+   - Verify `vercel.json` configuration
 
-## 📝 License
-
-This project is licensed under the MIT License.
+### Debug Mode
+Enable debug logging in MCP server:
+```python
+import logging
+logging.basicConfig(level=logging.DEBUG)
+```
 
 ## 🤝 Contributing
 
 1. Fork the repository
-2. Create a feature branch
-3. Make your changes
+2. Create feature branch
+3. Make changes
 4. Test thoroughly
-5. Submit a pull request
+5. Submit pull request
 
-## 📞 Support
+## 📄 License
 
-For support and questions, please open an issue in the repository.
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## 🆘 Support
+
+For issues and questions:
+- Check troubleshooting section
+- Review MCP server logs
+- Check browser console for frontend errors
+- Verify environment variable configuration
+
+## 🔄 Updates
+
+### Recent Changes
+- ✅ Complete MCP implementation
+- ✅ Real Gmail API integration
+- ✅ Real Google Calendar API integration
+- ✅ Production-ready deployment configuration
+- ✅ Enhanced error handling and fallbacks
+- ✅ Environment variable support for Vercel
+
+### Next Steps
+- [ ] Add more sophisticated appointment matching
+- [ ] Implement patient authentication
+- [ ] Add payment processing
+- [ ] Enhanced analytics dashboard
+- [ ] Mobile app development
