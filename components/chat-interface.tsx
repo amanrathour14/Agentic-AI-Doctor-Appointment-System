@@ -28,6 +28,9 @@ interface MCPTool {
 }
 
 export default function ChatInterface({ userRole = "patient" }: { userRole?: string }) {
+  // Ensure userRole is always a string
+  const safeUserRole = userRole || "patient"
+  
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [inputValue, setInputValue] = useState("")
   const [isLoading, setIsLoading] = useState(false)
@@ -38,13 +41,37 @@ export default function ChatInterface({ userRole = "patient" }: { userRole?: str
   const [mcpError, setMcpError] = useState<string>("")
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
+  // Ensure sessionId is always a string
+  const safeSessionId = sessionId || ""
+  
+  // Ensure messages is always an array
+  const safeMessages = Array.isArray(messages) ? messages : []
+  
+  // Ensure availableTools is always an array
+  const safeAvailableTools = Array.isArray(availableTools) ? availableTools : []
+  
+  // Ensure mcpStatus is always a string
+  const safeMcpStatus = mcpStatus || "checking"
+  
+  // Ensure mcpError is always a string
+  const safeMcpError = mcpError || ""
+  
+  // Ensure isLoading is always a boolean
+  const safeIsLoading = isLoading === true
+  
+  // Ensure showTools is always a boolean
+  const safeShowTools = showTools === true
+  
+  // Ensure inputValue is always a string
+  const safeInputValue = inputValue || ""
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }
 
   useEffect(() => {
     scrollToBottom()
-  }, [messages])
+  }, [safeMessages])
 
   useEffect(() => {
     const initializeChat = async () => {
@@ -53,13 +80,14 @@ export default function ChatInterface({ userRole = "patient" }: { userRole?: str
         const sessionResponse = await fetch("/api/sessions", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ user_role: userRole })
+          body: JSON.stringify({ user_role: safeUserRole })
         })
         
         if (sessionResponse.ok) {
           const data = await sessionResponse.json()
-          setSessionId(data.session_id)
-          mcpClient.setSessionId(data.session_id)
+          const sessionId = data?.session_id || `session_${Date.now()}`
+          setSessionId(sessionId)
+          mcpClient.setSessionId(sessionId)
           
           // Check MCP server status with timeout
           try {
@@ -68,28 +96,32 @@ export default function ChatInterface({ userRole = "patient" }: { userRole?: str
               new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 5000))
             ])
             
-            if (mcpHealthy) {
+            if (mcpHealthy === true) {
               setMcpStatus("connected")
               setMcpError("")
               
               // Discover available MCP tools
               try {
                 const toolsInfo = await mcpClient.discoverTools()
-                setAvailableTools(toolsInfo.tools)
-                console.log("MCP tools discovered:", toolsInfo.tools)
+                const tools = Array.isArray(toolsInfo?.tools) ? toolsInfo.tools : []
+                setAvailableTools(tools)
+                console.log("MCP tools discovered:", tools)
               } catch (error) {
                 console.warn("MCP tool discovery failed:", error)
                 setMcpStatus("tools_failed")
                 setMcpError("Tool discovery failed, but basic chat is available")
+                setAvailableTools([])
               }
             } else {
               setMcpStatus("disconnected")
               setMcpError("MCP server not responding")
+              setAvailableTools([])
             }
           } catch (error) {
             console.warn("MCP health check failed:", error)
             setMcpStatus("disconnected")
             setMcpError("Cannot connect to MCP server")
+            setAvailableTools([])
           }
           
           // Add welcome message
@@ -124,15 +156,15 @@ export default function ChatInterface({ userRole = "patient" }: { userRole?: str
     }
 
     initializeChat()
-  }, [userRole])
+  }, [safeUserRole])
 
   const handleSendMessage = async () => {
-    if (!inputValue.trim() || !sessionId) return
+    if (!safeInputValue?.trim() || !safeSessionId) return
 
     const userMessage: ChatMessage = {
       id: Date.now().toString(),
       role: "user",
-      content: inputValue,
+      content: safeInputValue,
       timestamp: new Date()
     }
 
@@ -142,8 +174,8 @@ export default function ChatInterface({ userRole = "patient" }: { userRole?: str
 
     try {
       // Only try MCP tools if server is connected
-      if (mcpStatus === "connected") {
-        const mcpResponse = await processMessageWithMCP(inputValue, userRole)
+      if (safeMcpStatus === "connected") {
+        const mcpResponse = await processMessageWithMCP(safeInputValue, safeUserRole)
         
         if (mcpResponse) {
           setMessages(prev => [...prev, mcpResponse])
@@ -157,9 +189,9 @@ export default function ChatInterface({ userRole = "patient" }: { userRole?: str
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          message: inputValue,
-          session_id: sessionId,
-          user_role: userRole
+          message: safeInputValue,
+          session_id: safeSessionId,
+          user_role: safeUserRole
         })
       })
 
@@ -168,9 +200,9 @@ export default function ChatInterface({ userRole = "patient" }: { userRole?: str
         const assistantMessage: ChatMessage = {
           id: (Date.now() + 1).toString(),
           role: "assistant",
-          content: data.response,
+          content: data?.response || "I'm sorry, I didn't get a proper response. Please try again.",
           timestamp: new Date(),
-          toolCalls: data.tool_calls
+          toolCalls: data?.tool_calls || []
         }
         setMessages(prev => [...prev, assistantMessage])
       } else {
@@ -191,7 +223,7 @@ export default function ChatInterface({ userRole = "patient" }: { userRole?: str
   }
 
   const processMessageWithMCP = async (message: string, role: string): Promise<ChatMessage | null> => {
-    if (mcpStatus !== "connected") {
+    if (safeMcpStatus !== "connected") {
       return null
     }
 
@@ -209,15 +241,19 @@ export default function ChatInterface({ userRole = "patient" }: { userRole?: str
           symptoms: "General consultation"
         })
 
+        // Safe access to result properties with fallbacks
+        const resultText = result?.content?.[0]?.text || 'Processing...'
+        const isError = result?.isError || false
+
         return {
           id: (Date.now() + 1).toString(),
           role: "assistant",
-          content: `I've scheduled your appointment! Here are the details:\n\n**Appointment ID:** ${result.content?.[0]?.text || 'Processing...'}\n\n${result.isError ? 'There was an error, but I\'m working on it.' : 'Appointment scheduled successfully!'}`,
+          content: `I've scheduled your appointment! Here are the details:\n\n**Appointment ID:** ${resultText}\n\n${isError ? 'There was an error, but I\'m working on it.' : 'Appointment scheduled successfully!'}`,
           timestamp: new Date(),
           toolCalls: [{
             tool_name: "schedule_appointment",
-            result: result,
-            success: !result.isError
+            result: result || {},
+            success: !isError
           }]
         }
       } catch (error) {
@@ -234,15 +270,19 @@ export default function ChatInterface({ userRole = "patient" }: { userRole?: str
           date: "2024-01-15"
         })
 
+        // Safe access to result properties with fallbacks
+        const resultText = result?.content?.[0]?.text || 'Checking availability...'
+        const isError = result?.isError || false
+
         return {
           id: (Date.now() + 1).toString(),
           role: "assistant",
-          content: `Here's the availability for Dr. Smith on 2024-01-15:\n\n${result.content?.[0]?.text || 'Checking availability...'}`,
+          content: `Here's the availability for Dr. Smith on 2024-01-15:\n\n${resultText}`,
           timestamp: new Date(),
           toolCalls: [{
             tool_name: "check_doctor_availability",
-            result: result,
-            success: !result.isError
+            result: result || {},
+            success: !isError
           }]
         }
       } catch (error) {
@@ -256,15 +296,19 @@ export default function ChatInterface({ userRole = "patient" }: { userRole?: str
       try {
         const result = await appointmentTools.listDoctors()
 
+        // Safe access to result properties with fallbacks
+        const resultText = result?.content?.[0]?.text || 'Loading doctors...'
+        const isError = result?.isError || false
+
         return {
           id: (Date.now() + 1).toString(),
           role: "assistant",
-          content: `Here are the available doctors:\n\n${result.content?.[0]?.text || 'Loading doctors...'}`,
+          content: `Here are the available doctors:\n\n${resultText}`,
           timestamp: new Date(),
           toolCalls: [{
             tool_name: "list_doctors",
-            result: result,
-            success: !result.isError
+            result: result || {},
+            success: !isError
           }]
         }
       } catch (error) {
@@ -277,7 +321,9 @@ export default function ChatInterface({ userRole = "patient" }: { userRole?: str
   }
 
   const handleSuggestionClick = (suggestion: string) => {
-    setInputValue(suggestion)
+    if (suggestion && typeof suggestion === 'string') {
+      setInputValue(suggestion)
+    }
   }
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -287,23 +333,25 @@ export default function ChatInterface({ userRole = "patient" }: { userRole?: str
     }
   }
 
-  const getMCPStatusColor = () => {
-    switch (mcpStatus) {
+  const getMCPStatusColor = (): string => {
+    switch (safeMcpStatus) {
       case "connected": return "bg-green-500"
       case "disconnected": return "bg-red-500"
       case "tools_failed": return "bg-yellow-500"
       case "error": return "bg-red-600"
+      case "checking": return "bg-gray-500"
       default: return "bg-gray-500"
     }
   }
 
-  const getMCPStatusText = () => {
-    switch (mcpStatus) {
+  const getMCPStatusText = (): string => {
+    switch (safeMcpStatus) {
       case "connected": return "MCP Connected"
       case "disconnected": return "MCP Disconnected"
       case "tools_failed": return "MCP Tools Failed"
       case "error": return "MCP Error"
-      default: return "Checking MCP..."
+      case "checking": return "Checking MCP..."
+      default: return "Unknown Status"
     }
   }
 
@@ -313,17 +361,25 @@ export default function ChatInterface({ userRole = "patient" }: { userRole?: str
     
     try {
       const mcpHealthy = await mcpClient.healthCheck()
-      if (mcpHealthy) {
+      if (mcpHealthy === true) {
         setMcpStatus("connected")
-        const toolsInfo = await mcpClient.discoverTools()
-        setAvailableTools(toolsInfo.tools)
+        try {
+          const toolsInfo = await mcpClient.discoverTools()
+          const tools = Array.isArray(toolsInfo?.tools) ? toolsInfo.tools : []
+          setAvailableTools(tools)
+        } catch (error) {
+          console.warn("Tool discovery failed during retry:", error)
+          setAvailableTools([])
+        }
       } else {
         setMcpStatus("disconnected")
         setMcpError("MCP server not responding")
+        setAvailableTools([])
       }
     } catch (error) {
       setMcpStatus("error")
       setMcpError("Connection failed")
+      setAvailableTools([])
     }
   }
 
@@ -345,11 +401,13 @@ export default function ChatInterface({ userRole = "patient" }: { userRole?: str
           <div className="flex items-center space-x-2">
             {/* MCP Status Indicator */}
             <div className="flex items-center space-x-2">
-              <div className={`px-3 py-2 rounded-lg text-white text-sm ${getMCPStatusColor()}`}>
-                {getMCPStatusText()}
-              </div>
+              {safeMcpStatus && typeof safeMcpStatus === 'string' && (
+                <div className={`px-3 py-2 rounded-lg text-white text-sm ${getMCPStatusColor()}`}>
+                  {getMCPStatusText()}
+                </div>
+              )}
               
-              {mcpStatus === "disconnected" && (
+              {safeMcpStatus === "disconnected" && (
                 <button
                   onClick={retryMCPConnection}
                   className="px-2 py-1 text-xs bg-blue-500 hover:bg-blue-600 text-white rounded transition-colors"
@@ -359,23 +417,25 @@ export default function ChatInterface({ userRole = "patient" }: { userRole?: str
               )}
             </div>
             
-            <button
-              onClick={() => setShowTools(!showTools)}
-              className="flex items-center space-x-2 px-3 py-2 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
-            >
-              <Tool className="w-4 h-4" />
-              <span>MCP Tools ({availableTools.length})</span>
-            </button>
+            {safeMcpStatus === "connected" && (
+              <button
+                onClick={() => setShowTools(!safeShowTools)}
+                className="flex items-center space-x-2 px-3 py-2 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+              >
+                <Tool className="w-4 h-4" />
+                <span>MCP Tools ({safeAvailableTools.length})</span>
+              </button>
+            )}
           </div>
         </div>
         
         {/* MCP Error Display */}
-        {mcpError && (
+        {safeMcpError && typeof safeMcpError === 'string' && safeMcpError.trim() && (
           <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
             <div className="flex items-center space-x-2">
               <AlertCircle className="w-4 h-4 text-yellow-600" />
               <span className="text-sm text-yellow-800">
-                {mcpError}. Basic chat functionality is still available.
+                {safeMcpError}. Basic chat functionality is still available.
               </span>
             </div>
           </div>
@@ -383,27 +443,27 @@ export default function ChatInterface({ userRole = "patient" }: { userRole?: str
       </div>
 
       {/* Tools Panel */}
-      {showTools && (
+      {safeShowTools && safeMcpStatus === "connected" && (
         <div className="bg-gray-50 border-b border-gray-200 p-4">
           <h3 className="text-sm font-medium text-gray-700 mb-3">Available MCP Tools</h3>
-          {availableTools.length > 0 ? (
+          {safeAvailableTools.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-              {availableTools.map((tool) => (
-                <div key={tool.name} className="bg-white p-3 rounded-lg border border-gray-200">
+              {safeAvailableTools.map((tool) => (
+                <div key={tool.name || `tool-${Math.random()}`} className="bg-white p-3 rounded-lg border border-gray-200">
                   <div className="flex items-center space-x-2 mb-2">
                     <Wrench className="w-4 h-4 text-blue-600" />
-                    <span className="font-medium text-sm">{tool.name}</span>
+                    <span className="font-medium text-sm">{tool.name || 'Unnamed Tool'}</span>
                   </div>
-                  <p className="text-xs text-gray-600 mb-2">{tool.description}</p>
+                  <p className="text-xs text-gray-600 mb-2">{tool.description || 'No description available'}</p>
                   <div className="text-xs text-gray-500">
-                    <strong>Parameters:</strong> {Object.keys(tool.inputSchema.properties || {}).join(", ")}
+                    <strong>Parameters:</strong> {tool.inputSchema?.properties ? Object.keys(tool.inputSchema.properties).join(", ") : 'No parameters'}
                   </div>
                 </div>
               ))}
             </div>
           ) : (
             <div className="text-center py-4 text-gray-500">
-              {mcpStatus === "connected" ? "No tools available" : "Tools not loaded - check MCP connection"}
+              {safeMcpStatus === "connected" ? "No tools available" : "Tools not loaded - check MCP connection"}
             </div>
           )}
         </div>
@@ -411,8 +471,8 @@ export default function ChatInterface({ userRole = "patient" }: { userRole?: str
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {messages.map((message) => (
-          <div key={message.id} className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}>
+        {safeMessages.map((message) => (
+          <div key={message.id || `msg-${Math.random()}`} className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}>
             <div className={`flex items-start space-x-3 max-w-[80%] ${message.role === "user" ? "flex-row-reverse space-x-reverse" : ""}`}>
               <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
                 message.role === "user" ? "bg-blue-600" : "bg-gray-600"
@@ -429,22 +489,24 @@ export default function ChatInterface({ userRole = "patient" }: { userRole?: str
                   ? "bg-blue-600 text-white" 
                   : "bg-gray-100 text-gray-900"
               }`}>
-                <div className="whitespace-pre-wrap">{message.content}</div>
+                <div className="whitespace-pre-wrap">{message.content || 'No content'}</div>
                 
                 {/* Tool Calls */}
-                {message.toolCalls && message.toolCalls.length > 0 && (
+                {message.toolCalls && Array.isArray(message.toolCalls) && message.toolCalls.length > 0 && (
                   <div className="mt-3 space-y-2">
                     {message.toolCalls.map((toolCall, index) => (
                       <div key={index} className={`text-xs p-2 rounded ${
                         toolCall.success ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
                       }`}>
-                        <div className="font-medium">{toolCall.tool_name}</div>
+                        <div className="font-medium">{toolCall.tool_name || 'Unknown Tool'}</div>
                         <div className="text-xs opacity-75">
                           {toolCall.success ? "Success" : "Failed"}
                         </div>
-                        {toolCall.result && (
+                        {toolCall.result && typeof toolCall.result === 'object' && (
                           <div className="text-xs mt-1">
-                            <pre className="whitespace-pre-wrap">{JSON.stringify(toolCall.result, null, 2)}</pre>
+                            <pre className="whitespace-pre-wrap">
+                              {JSON.stringify(toolCall.result, null, 2)}
+                            </pre>
                           </div>
                         )}
                       </div>
@@ -453,15 +515,15 @@ export default function ChatInterface({ userRole = "patient" }: { userRole?: str
                 )}
                 
                 {/* Suggestions */}
-                {message.suggestions && message.suggestions.length > 0 && (
+                {message.suggestions && Array.isArray(message.suggestions) && message.suggestions.length > 0 && (
                   <div className="mt-3 flex flex-wrap gap-2">
                     {message.suggestions.map((suggestion, index) => (
                       <button
                         key={index}
-                        onClick={() => handleSuggestionClick(suggestion)}
+                        onClick={() => handleSuggestionClick(suggestion || '')}
                         className="px-3 py-1 text-xs bg-blue-100 hover:bg-blue-200 text-blue-800 rounded-full transition-colors"
                       >
-                        {suggestion}
+                        {suggestion || 'Suggestion'}
                       </button>
                     ))}
                   </div>
@@ -471,7 +533,7 @@ export default function ChatInterface({ userRole = "patient" }: { userRole?: str
           </div>
         ))}
         
-        {isLoading && (
+        {safeIsLoading && (
           <div className="flex justify-start">
             <div className="flex items-start space-x-3">
               <div className="w-8 h-8 bg-gray-600 rounded-full flex items-center justify-center">
@@ -495,18 +557,18 @@ export default function ChatInterface({ userRole = "patient" }: { userRole?: str
         <div className="flex space-x-3">
           <div className="flex-1">
             <textarea
-              value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
+              value={safeInputValue || ''}
+              onChange={(e) => setInputValue(e.target.value || '')}
               onKeyPress={handleKeyPress}
               placeholder="Type your message here..."
               className="w-full p-3 border border-gray-300 rounded-lg resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               rows={2}
-              disabled={isLoading}
+              disabled={safeIsLoading}
             />
           </div>
           <button
             onClick={handleSendMessage}
-            disabled={!inputValue.trim() || isLoading}
+            disabled={!safeInputValue?.trim() || safeIsLoading}
             className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center space-x-2"
           >
             <Send className="w-4 h-4" />
