@@ -1,0 +1,10 @@
+nohup: ignoring input
+No credentials.json found. Please set up OAuth2 credentials.
+No credentials.json found. Please set up OAuth2 credentials.
+INFO:     Started server process [22211]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     127.0.0.1:37720 - "GET /mcp HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39936 - "GET /mcp/tools HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39950 - "POST /mcp/tools/call HTTP/1.1" 200 OK

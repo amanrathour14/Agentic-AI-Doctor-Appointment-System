@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react"
 import { Send, Bot, User, Loader2, Calendar, Stethoscope, BarChart3, Wrench, Tool } from "lucide-react"
-import { toolClient, appointmentTools, doctorTools, searchTools } from "@/lib/tool-client"
+import { mcpClient, appointmentTools, doctorTools, searchTools } from "@/lib/mcp-client"
 
 interface ChatMessage {
   id: string
@@ -17,17 +17,14 @@ interface ChatMessage {
   suggestions?: string[]
 }
 
-interface ToolDefinition {
+interface MCPTool {
   name: string
   description: string
-  type: string
-  parameters: Array<{
-    name: string
+  inputSchema: {
     type: string
-    description: string
-    required: boolean
-  }>
-  tags: string[]
+    properties: Record<string, any>
+    required: string[]
+  }
 }
 
 export default function ChatInterface({ userRole = "patient" }: { userRole?: string }) {
@@ -35,8 +32,9 @@ export default function ChatInterface({ userRole = "patient" }: { userRole?: str
   const [inputValue, setInputValue] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [sessionId, setSessionId] = useState<string>("")
-  const [availableTools, setAvailableTools] = useState<ToolDefinition[]>([])
+  const [availableTools, setAvailableTools] = useState<MCPTool[]>([])
   const [showTools, setShowTools] = useState(false)
+  const [mcpStatus, setMcpStatus] = useState<string>("checking")
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   const scrollToBottom = () => {
@@ -60,10 +58,24 @@ export default function ChatInterface({ userRole = "patient" }: { userRole?: str
         if (sessionResponse.ok) {
           const data = await sessionResponse.json()
           setSessionId(data.session_id)
+          mcpClient.setSessionId(data.session_id)
           
-          // Discover available tools
-          const tools = await toolClient.discoverTools()
-          setAvailableTools(tools)
+          // Check MCP server status
+          const mcpHealthy = await mcpClient.healthCheck()
+          if (mcpHealthy) {
+            setMcpStatus("connected")
+            // Discover available MCP tools
+            try {
+              const toolsInfo = await mcpClient.discoverTools()
+              setAvailableTools(toolsInfo.tools)
+              console.log("MCP tools discovered:", toolsInfo.tools)
+            } catch (error) {
+              console.warn("MCP tool discovery failed:", error)
+              setMcpStatus("tools_failed")
+            }
+          } else {
+            setMcpStatus("disconnected")
+          }
           
           // Add welcome message
           setMessages([
@@ -112,11 +124,11 @@ export default function ChatInterface({ userRole = "patient" }: { userRole?: str
     setIsLoading(true)
 
     try {
-      // Try to process with tools first
-      const toolResponse = await processMessageWithTools(inputValue, userRole)
+      // Try to process with MCP tools first
+      const mcpResponse = await processMessageWithMCP(inputValue, userRole)
       
-      if (toolResponse) {
-        setMessages(prev => [...prev, toolResponse])
+      if (mcpResponse) {
+        setMessages(prev => [...prev, mcpResponse])
       } else {
         // Fallback to regular chat
         const response = await fetch("/api/chat", {
@@ -157,13 +169,12 @@ export default function ChatInterface({ userRole = "patient" }: { userRole?: str
     }
   }
 
-  const processMessageWithTools = async (message: string, role: string): Promise<ChatMessage | null> => {
+  const processMessageWithMCP = async (message: string, role: string): Promise<ChatMessage | null> => {
     const lowerMessage = message.toLowerCase()
     
     // Check for appointment scheduling
     if (lowerMessage.includes("schedule") || lowerMessage.includes("book") || lowerMessage.includes("appointment")) {
       try {
-        // Extract basic info from message (in real implementation, this would use NLP)
         const result = await appointmentTools.scheduleAppointment({
           doctor_name: "Dr. Smith", // Default - would be extracted from message
           patient_name: "John Doe", // Default - would be extracted from message
@@ -176,12 +187,12 @@ export default function ChatInterface({ userRole = "patient" }: { userRole?: str
         return {
           id: (Date.now() + 1).toString(),
           role: "assistant",
-          content: `I've scheduled your appointment! Here are the details:\n\n**Appointment ID:** ${result.result.appointment_id}\n**Status:** ${result.result.status}\n**Calendar Event:** ${result.result.calendar_event_id ? 'Created' : 'Not created'}\n**Email Confirmation:** ${result.result.email_sent ? 'Sent' : 'Not sent'}\n\n${result.result.message}`,
+          content: `I've scheduled your appointment! Here are the details:\n\n**Appointment ID:** ${result.content?.[0]?.text || 'Processing...'}\n\n${result.isError ? 'There was an error, but I\'m working on it.' : 'Appointment scheduled successfully!'}`,
           timestamp: new Date(),
           toolCalls: [{
             tool_name: "schedule_appointment",
-            result: result.result,
-            success: result.result.status === "scheduled"
+            result: result,
+            success: !result.isError
           }]
         }
       } catch (error) {
@@ -201,12 +212,12 @@ export default function ChatInterface({ userRole = "patient" }: { userRole?: str
         return {
           id: (Date.now() + 1).toString(),
           role: "assistant",
-          content: `Here's the availability for Dr. Smith on 2024-01-15:\n\n**Available Slots:** ${result.result.total_available}\n**Booked Slots:** ${result.result.total_booked}\n\n${result.result.message}`,
+          content: `Here's the availability for Dr. Smith on 2024-01-15:\n\n${result.content?.[0]?.text || 'Checking availability...'}`,
           timestamp: new Date(),
           toolCalls: [{
             tool_name: "check_doctor_availability",
-            result: result.result,
-            success: !result.result.error
+            result: result,
+            success: !result.isError
           }]
         }
       } catch (error) {
@@ -223,12 +234,12 @@ export default function ChatInterface({ userRole = "patient" }: { userRole?: str
         return {
           id: (Date.now() + 1).toString(),
           role: "assistant",
-          content: `Here are the available doctors:\n\n${result.result.doctors.map((d: any) => `• **${d.name}** - ${d.specialty} (${d.location})`).join('\n')}\n\nTotal: ${result.result.count} doctors`,
+          content: `Here are the available doctors:\n\n${result.content?.[0]?.text || 'Loading doctors...'}`,
           timestamp: new Date(),
           toolCalls: [{
             tool_name: "list_doctors",
-            result: result.result,
-            success: !result.result.error
+            result: result,
+            success: !result.isError
           }]
         }
       } catch (error) {
@@ -251,6 +262,24 @@ export default function ChatInterface({ userRole = "patient" }: { userRole?: str
     }
   }
 
+  const getMCPStatusColor = () => {
+    switch (mcpStatus) {
+      case "connected": return "bg-green-500"
+      case "disconnected": return "bg-red-500"
+      case "tools_failed": return "bg-yellow-500"
+      default: return "bg-gray-500"
+    }
+  }
+
+  const getMCPStatusText = () => {
+    switch (mcpStatus) {
+      case "connected": return "MCP Connected"
+      case "disconnected": return "MCP Disconnected"
+      case "tools_failed": return "MCP Tools Failed"
+      default: return "Checking MCP..."
+    }
+  }
+
   return (
     <div className="flex flex-col h-full max-w-4xl mx-auto">
       {/* Header */}
@@ -267,12 +296,17 @@ export default function ChatInterface({ userRole = "patient" }: { userRole?: str
           </div>
           
           <div className="flex items-center space-x-2">
+            {/* MCP Status Indicator */}
+            <div className={`px-3 py-2 rounded-lg text-white text-sm ${getMCPStatusColor()}`}>
+              {getMCPStatusText()}
+            </div>
+            
             <button
               onClick={() => setShowTools(!showTools)}
               className="flex items-center space-x-2 px-3 py-2 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
             >
               <Tool className="w-4 h-4" />
-              <span>Tools ({availableTools.length})</span>
+              <span>MCP Tools ({availableTools.length})</span>
             </button>
           </div>
         </div>
@@ -281,7 +315,7 @@ export default function ChatInterface({ userRole = "patient" }: { userRole?: str
       {/* Tools Panel */}
       {showTools && (
         <div className="bg-gray-50 border-b border-gray-200 p-4">
-          <h3 className="text-sm font-medium text-gray-700 mb-3">Available Tools</h3>
+          <h3 className="text-sm font-medium text-gray-700 mb-3">Available MCP Tools</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
             {availableTools.map((tool) => (
               <div key={tool.name} className="bg-white p-3 rounded-lg border border-gray-200">
@@ -290,12 +324,8 @@ export default function ChatInterface({ userRole = "patient" }: { userRole?: str
                   <span className="font-medium text-sm">{tool.name}</span>
                 </div>
                 <p className="text-xs text-gray-600 mb-2">{tool.description}</p>
-                <div className="flex flex-wrap gap-1">
-                  {tool.tags.map((tag) => (
-                    <span key={tag} className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded">
-                      {tag}
-                    </span>
-                  ))}
+                <div className="text-xs text-gray-500">
+                  <strong>Parameters:</strong> {Object.keys(tool.inputSchema.properties || {}).join(", ")}
                 </div>
               </div>
             ))}
@@ -336,6 +366,11 @@ export default function ChatInterface({ userRole = "patient" }: { userRole?: str
                         <div className="text-xs opacity-75">
                           {toolCall.success ? "Success" : "Failed"}
                         </div>
+                        {toolCall.result && (
+                          <div className="text-xs mt-1">
+                            <pre className="whitespace-pre-wrap">{JSON.stringify(toolCall.result, null, 2)}</pre>
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
