@@ -8,7 +8,8 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Send, Bot, User, Loader2, Calendar, Stethoscope, BarChart3 } from "lucide-react"
+import { Send, Bot, User, Loader2, Calendar, Stethoscope, BarChart3, Wrench } from "lucide-react"
+import { mcpClient, appointmentTools, doctorTools, searchTools } from "@/lib/mcp-client"
 
 interface ChatMessage {
   id: string
@@ -16,9 +17,11 @@ interface ChatMessage {
   content: string
   timestamp: Date
   toolCalls?: Array<{
-    function_name: string
+    tool_name: string
     result: any
+    success: boolean
   }>
+  suggestions?: string[]
 }
 
 interface ChatInterfaceProps {
@@ -35,17 +38,22 @@ export default function ChatInterface({ userRole }: ChatInterfaceProps) {
           ? "Hello! I'm your AI medical assistant. I can help you schedule appointments, check doctor availability, and answer questions about your healthcare. How can I assist you today?"
           : "Hello Doctor! I can help you get appointment statistics, view patient reports, and manage your schedule. What would you like to know?",
       timestamp: new Date(),
+      suggestions: userRole === "patient" 
+        ? ["Schedule an appointment", "Check doctor availability", "Find doctors by specialty"]
+        : ["View appointment stats", "Check my schedule", "Search patients by symptoms"]
     },
   ])
   const [inputValue, setInputValue] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [sessionId, setSessionId] = useState<string | null>(null)
+  const [availableTools, setAvailableTools] = useState<any[]>([])
   const scrollAreaRef = useRef<HTMLDivElement>(null)
 
-  // Initialize session
+  // Initialize session and discover tools
   useEffect(() => {
-    const initSession = async () => {
+    const initializeChat = async () => {
       try {
+        // Create session
         const response = await fetch("/api/session/create", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -53,12 +61,22 @@ export default function ChatInterface({ userRole }: ChatInterfaceProps) {
         })
         const data = await response.json()
         setSessionId(data.session_id)
+        mcpClient.setSessionId(data.session_id)
         console.log("[v0] Session created:", data.session_id)
+
+        // Discover MCP tools
+        try {
+          const toolsInfo = await mcpClient.discoverTools(true)
+          setAvailableTools(toolsInfo.tools)
+          console.log("[MCP] Available tools:", toolsInfo.tools)
+        } catch (error) {
+          console.warn("MCP tool discovery failed, using fallback:", error)
+        }
       } catch (error) {
-        console.error("Failed to create session:", error)
+        console.error("Failed to initialize chat:", error)
       }
     }
-    initSession()
+    initializeChat()
   }, [userRole])
 
   // Auto-scroll to bottom
@@ -83,207 +101,476 @@ export default function ChatInterface({ userRole }: ChatInterfaceProps) {
     setIsLoading(true)
 
     try {
-      const response = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          message: inputValue,
-          session_id: sessionId,
-          user_type: userRole,
-        }),
-      })
+      // First, try to use MCP tools directly
+      const mcpResponse = await processMessageWithMCP(inputValue, userRole)
+      
+      if (mcpResponse) {
+        const assistantMessage: ChatMessage = {
+          id: (Date.now() + 1).toString(),
+          role: "assistant",
+          content: mcpResponse.content,
+          timestamp: new Date(),
+          toolCalls: mcpResponse.toolCalls,
+          suggestions: mcpResponse.suggestions
+        }
+        
+        setMessages((prev) => [...prev, assistantMessage])
+      } else {
+        // Fallback to regular chat API
+        const response = await fetch("/api/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            message: inputValue,
+            session_id: sessionId,
+            user_type: userRole,
+          }),
+        })
 
-      const data = await response.json()
-      console.log("[v0] Chat response received:", data)
+        const data = await response.json()
+        console.log("[v0] Chat response received:", data)
 
-      const assistantMessage: ChatMessage = {
-        id: (Date.now() + 1).toString(),
-        role: "assistant",
-        content: data.response,
-        timestamp: new Date(),
-        toolCalls: data.tool_calls,
+        const assistantMessage: ChatMessage = {
+          id: (Date.now() + 1).toString(),
+          role: "assistant",
+          content: data.response,
+          timestamp: new Date(),
+          toolCalls: data.tool_calls,
+          suggestions: data.suggestions
+        }
+
+        setMessages((prev) => [...prev, assistantMessage])
       }
-
-      setMessages((prev) => [...prev, assistantMessage])
     } catch (error) {
-      console.error("Chat error:", error)
+      console.error("Error processing message:", error)
+      
       const errorMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
         role: "assistant",
-        content: "I apologize, but I encountered an error. Please try again.",
+        content: "I apologize, but I encountered an error processing your request. Please try again or rephrase your question.",
         timestamp: new Date(),
       }
+      
       setMessages((prev) => [...prev, errorMessage])
     } finally {
       setIsLoading(false)
     }
   }
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault()
-      handleSendMessage()
+  const processMessageWithMCP = async (message: string, userRole: "patient" | "doctor") => {
+    try {
+      const lowerMessage = message.toLowerCase()
+      
+      // Patient-specific tool calls
+      if (userRole === "patient") {
+        // Schedule appointment
+        if (lowerMessage.includes("schedule") || lowerMessage.includes("book") || lowerMessage.includes("make appointment")) {
+          const result = await handleAppointmentScheduling(message)
+          return {
+            content: result.content,
+            toolCalls: result.toolCalls,
+            suggestions: ["Check appointment status", "Modify appointment", "Cancel appointment"]
+          }
+        }
+        
+        // Check availability
+        if (lowerMessage.includes("available") || lowerMessage.includes("availability") || lowerMessage.includes("when")) {
+          const result = await handleAvailabilityCheck(message)
+          return {
+            content: result.content,
+            toolCalls: result.toolCalls,
+            suggestions: ["Schedule appointment", "Find other doctors", "Check different dates"]
+          }
+        }
+        
+        // List doctors
+        if (lowerMessage.includes("doctor") || lowerMessage.includes("specialist") || lowerMessage.includes("find")) {
+          const result = await handleDoctorSearch(message)
+          return {
+            content: result.content,
+            toolCalls: result.toolCalls,
+            suggestions: ["Schedule with this doctor", "Check availability", "Find other specialists"]
+          }
+        }
+      }
+      
+      // Doctor-specific tool calls
+      if (userRole === "doctor") {
+        // Get appointment stats
+        if (lowerMessage.includes("stats") || lowerMessage.includes("statistics") || lowerMessage.includes("report")) {
+          const result = await handleAppointmentStats(message)
+          return {
+            content: result.content,
+            toolCalls: result.toolCalls,
+            suggestions: ["View detailed report", "Check patient history", "Export data"]
+          }
+        }
+        
+        // Search patients
+        if (lowerMessage.includes("patient") || lowerMessage.includes("search") || lowerMessage.includes("symptoms")) {
+          const result = await handlePatientSearch(message)
+          return {
+            content: result.content,
+            toolCalls: result.toolCalls,
+            suggestions: ["View patient details", "Check appointment history", "Send notification"]
+          }
+        }
+      }
+      
+      return null // No MCP tool matched, fall back to regular chat
+      
+    } catch (error) {
+      console.error("Error in MCP processing:", error)
+      return null
     }
   }
 
-  const getToolIcon = (toolName: string) => {
-    switch (toolName) {
-      case "check_doctor_availability":
-      case "schedule_appointment":
-        return <Calendar className="w-3 h-3" />
-      case "get_appointment_stats":
-        return <BarChart3 className="w-3 h-3" />
-      default:
-        return <Stethoscope className="w-3 h-3" />
+  const handleAppointmentScheduling = async (message: string) => {
+    // Extract appointment details from message (simplified)
+    const doctorMatch = message.match(/dr\.?\s*(\w+)/i)
+    const dateMatch = message.match(/(\d{1,2}\/\d{1,2}|\d{4}-\d{2}-\d{2})/)
+    const timeMatch = message.match(/(\d{1,2}:\d{2}\s*(?:am|pm)?)/i)
+    
+    if (doctorMatch && dateMatch) {
+      const doctorName = `Dr. ${doctorMatch[1]}`
+      const date = dateMatch[1]
+      const time = timeMatch ? timeMatch[1] : "09:00"
+      
+      try {
+        const result = await appointmentTools.scheduleAppointment({
+          doctor_name: doctorName,
+          patient_name: "Patient", // Would come from user profile
+          patient_email: "patient@example.com", // Would come from user profile
+          appointment_date: date,
+          appointment_time: time,
+          symptoms: "General consultation"
+        })
+        
+        return {
+          content: `Great! I've scheduled your appointment with ${doctorName} on ${date} at ${time}. You'll receive a confirmation email shortly.`,
+          toolCalls: [{
+            tool_name: "appointments/schedule_enhanced",
+            result: result,
+            success: true
+          }]
+        }
+      } catch (error) {
+        return {
+          content: "I'm sorry, but I couldn't schedule the appointment. Please try again or contact our support team.",
+          toolCalls: [{
+            tool_name: "appointments/schedule_enhanced",
+            result: { error: error.message },
+            success: false
+          }]
+        }
+      }
+    }
+    
+    return {
+      content: "I'd be happy to help you schedule an appointment! Please provide the doctor's name and preferred date/time.",
+      toolCalls: []
     }
   }
 
-  const suggestions =
-    userRole === "patient"
-      ? [
-          "I want to book an appointment with Dr. Ahuja tomorrow morning",
-          "What doctors are available this Friday afternoon?",
-          "Check Dr. Johnson's availability for next week",
-        ]
-      : [
-          "How many patients visited yesterday?",
-          "Show me appointments for today",
-          "How many patients with fever this week?",
-        ]
+  const handleAvailabilityCheck = async (message: string) => {
+    const doctorMatch = message.match(/dr\.?\s*(\w+)/i)
+    const dateMatch = message.match(/(\d{1,2}\/\d{1,2}|\d{4}-\d{2}-\d{2})/)
+    
+    if (doctorMatch && dateMatch) {
+      const doctorName = `Dr. ${doctorMatch[1]}`
+      const date = dateMatch[1]
+      
+      try {
+        const result = await appointmentTools.checkAvailability(doctorName, date)
+        
+        return {
+          content: `Here are the available slots for ${doctorName} on ${date}: ${result.available_slots.join(", ")}`,
+          toolCalls: [{
+            tool_name: "appointments/check_availability",
+            result: result,
+            success: true
+          }]
+        }
+      } catch (error) {
+        return {
+          content: "I couldn't check the availability. Please try again.",
+          toolCalls: [{
+            tool_name: "appointments/check_availability",
+            result: { error: error.message },
+            success: false
+          }]
+        }
+      }
+    }
+    
+    return {
+      content: "I can check doctor availability for you. Please provide the doctor's name and date.",
+      toolCalls: []
+    }
+  }
+
+  const handleDoctorSearch = async (message: string) => {
+    const specialtyMatch = message.match(/(?:specialist|specialty|find)\s+(?:in\s+)?(\w+)/i)
+    const specialty = specialtyMatch ? specialtyMatch[1] : undefined
+    
+    try {
+      const result = await doctorTools.listDoctors(specialty)
+      
+      const doctorList = result.doctors.map((d: any) => 
+        `${d.name} (${d.specialty}) - ${d.available ? 'Available' : 'Unavailable'}`
+      ).join('\n')
+      
+      return {
+        content: `Here are the available doctors${specialty ? ` in ${specialty}` : ''}:\n${doctorList}`,
+        toolCalls: [{
+          tool_name: "doctors/list",
+          result: result,
+          success: true
+        }]
+      }
+    } catch (error) {
+      return {
+        content: "I couldn't find the doctors. Please try again.",
+        toolCalls: [{
+          tool_name: "doctors/list",
+          result: { error: error.message },
+          success: false
+        }]
+      }
+    }
+  }
+
+  const handleAppointmentStats = async (message: string) => {
+    const doctorMatch = message.match(/dr\.?\s*(\w+)/i)
+    const periodMatch = message.match(/(day|week|month|year)/i)
+    
+    const doctorName = doctorMatch ? `Dr. ${doctorMatch[1]}` : "Dr. Smith"
+    const period = periodMatch ? periodMatch[1] as 'day' | 'week' | 'month' | 'year' : 'month'
+    
+    try {
+      const result = await doctorTools.getAppointmentStats(doctorName, period)
+      
+      return {
+        content: `Here are the appointment statistics for ${doctorName} (${period}):\nTotal: ${result.total_appointments}\nCompleted: ${result.completed}\nCancelled: ${result.cancelled}\nCompletion Rate: ${result.completion_rate}%`,
+        toolCalls: [{
+          tool_name: "analytics/appointment_stats",
+          result: result,
+          success: true
+        }]
+      }
+    } catch (error) {
+      return {
+        content: "I couldn't get the appointment statistics. Please try again.",
+        toolCalls: [{
+          tool_name: "analytics/appointment_stats",
+          result: { error: error.message },
+          success: false
+        }]
+      }
+    }
+  }
+
+  const handlePatientSearch = async (message: string) => {
+    const symptomsMatch = message.match(/symptoms?[:\s]+(.+)/i)
+    const symptoms = symptomsMatch ? symptomsMatch[1] : "general"
+    
+    try {
+      const result = await searchTools.searchPatientsBySymptoms(symptoms)
+      
+      if (result.patients.length > 0) {
+        const patientList = result.patients.map((p: any) => 
+          `${p.name} - ${p.symptoms} (Last visit: ${p.last_visit})`
+        ).join('\n')
+        
+        return {
+          content: `Found ${result.count} patients with symptoms: ${symptoms}\n${patientList}`,
+          toolCalls: [{
+            tool_name: "search/patients_by_symptoms",
+            result: result,
+            success: true
+          }]
+        }
+      } else {
+        return {
+          content: `No patients found with symptoms: ${symptoms}`,
+          toolCalls: [{
+            tool_name: "search/patients_by_symptoms",
+            result: result,
+            success: true
+          }]
+        }
+      }
+    } catch (error) {
+      return {
+        content: "I couldn't search for patients. Please try again.",
+        toolCalls: [{
+          tool_name: "search/patients_by_symptoms",
+          result: { error: error.message },
+          success: false
+        }]
+      }
+    }
+  }
+
+  const handleSuggestionClick = (suggestion: string) => {
+    setInputValue(suggestion)
+  }
 
   return (
-    <div className="flex flex-col h-[700px] max-w-5xl mx-auto">
-      <Card className="flex-1 flex flex-col bg-gradient-to-br from-white to-gray-50 shadow-xl border-0">
-        <CardHeader className="pb-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-t-lg">
-          <CardTitle className="flex items-center gap-3 text-xl">
-            <div className="flex items-center justify-center w-8 h-8 bg-white/20 rounded-lg">
-              <Bot className="w-5 h-5 text-white" />
-            </div>
-            AI Assistant Chat
-            {sessionId && (
-              <Badge variant="secondary" className="text-xs bg-white/20 text-white border-white/30">
-                Session Active
-              </Badge>
-            )}
-          </CardTitle>
-        </CardHeader>
-
-        <CardContent className="flex-1 flex flex-col p-0">
-          {/* Messages */}
-          <ScrollArea className="flex-1 px-6" ref={scrollAreaRef}>
-            <div className="space-y-6 py-6">
-              {messages.map((message) => (
-                <div
-                  key={message.id}
-                  className={`flex gap-4 ${message.role === "user" ? "justify-end" : "justify-start"}`}
-                >
-                  {message.role === "assistant" && (
-                    <div className="flex items-center justify-center w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex-shrink-0 mt-1 shadow-lg">
-                      <Bot className="w-5 h-5 text-white" />
-                    </div>
-                  )}
-
-                  <div className={`max-w-[75%] ${message.role === "user" ? "order-1" : ""}`}>
-                    <div
-                      className={`rounded-2xl px-5 py-4 shadow-md ${
-                        message.role === "user"
-                          ? "bg-gradient-to-r from-blue-500 to-purple-600 text-white ml-auto"
-                          : "bg-white border border-gray-200"
-                      }`}
-                    >
-                      <p
-                        className={`text-sm leading-relaxed whitespace-pre-wrap ${
-                          message.role === "user" ? "text-white" : "text-gray-800"
-                        }`}
-                      >
-                        {message.content}
-                      </p>
-                    </div>
-
-                    {message.toolCalls && message.toolCalls.length > 0 && (
-                      <div className="mt-3 space-y-2">
-                        {message.toolCalls.map((tool, index) => (
-                          <div
-                            key={index}
-                            className="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-lg px-4 py-2"
-                          >
-                            <div className="flex items-center gap-2 text-xs font-medium text-emerald-700">
-                              {getToolIcon(tool.function_name)}
-                              <span>Used: {tool.function_name.replace("_", " ")}</span>
-                            </div>
+    <div className="flex flex-col h-full">
+      {/* Chat Messages */}
+      <ScrollArea ref={scrollAreaRef} className="flex-1 p-4 space-y-4">
+        {messages.map((message) => (
+          <div
+            key={message.id}
+            className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
+          >
+            <div
+              className={`max-w-[80%] rounded-lg p-3 ${
+                message.role === "user"
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-muted"
+              }`}
+            >
+              <div className="flex items-start gap-2">
+                {message.role === "assistant" && (
+                  <Bot className="w-5 h-5 mt-0.5 text-primary" />
+                )}
+                <div className="flex-1">
+                  <p className="text-sm">{message.content}</p>
+                  
+                  {/* Tool Calls Display */}
+                  {message.toolCalls && message.toolCalls.length > 0 && (
+                    <div className="mt-2 space-y-2">
+                      {message.toolCalls.map((toolCall, index) => (
+                        <div key={index} className="text-xs bg-background/50 rounded p-2">
+                          <div className="flex items-center gap-1 mb-1">
+                            <Wrench className="w-3 h-3" />
+                            <span className="font-medium">{toolCall.tool_name}</span>
+                            <Badge variant={toolCall.success ? "default" : "destructive"} className="text-xs">
+                              {toolCall.success ? "Success" : "Failed"}
+                            </Badge>
                           </div>
-                        ))}
-                      </div>
-                    )}
-
-                    <p className="text-xs text-gray-500 mt-2">{message.timestamp.toLocaleTimeString()}</p>
-                  </div>
-
-                  {message.role === "user" && (
-                    <div className="flex items-center justify-center w-10 h-10 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-full flex-shrink-0 mt-1 shadow-lg">
-                      <User className="w-5 h-5 text-white" />
+                          {toolCall.success && (
+                            <pre className="text-xs overflow-x-auto">
+                              {JSON.stringify(toolCall.result, null, 2)}
+                            </pre>
+                          )}
+                          {!toolCall.success && (
+                            <span className="text-destructive">{toolCall.result?.error}</span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  
+                  {/* Suggestions */}
+                  {message.suggestions && message.suggestions.length > 0 && (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {message.suggestions.map((suggestion, index) => (
+                        <Button
+                          key={index}
+                          variant="outline"
+                          size="sm"
+                          className="text-xs h-7"
+                          onClick={() => handleSuggestionClick(suggestion)}
+                        >
+                          {suggestion}
+                        </Button>
+                      ))}
                     </div>
                   )}
                 </div>
-              ))}
-
-              {isLoading && (
-                <div className="flex gap-4 justify-start">
-                  <div className="flex items-center justify-center w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex-shrink-0 shadow-lg">
-                    <Bot className="w-5 h-5 text-white" />
-                  </div>
-                  <div className="bg-white border border-gray-200 rounded-2xl px-5 py-4 shadow-md">
-                    <div className="flex items-center gap-3">
-                      <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
-                      <span className="text-sm text-gray-600">Thinking...</span>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          </ScrollArea>
-
-          {messages.length === 1 && (
-            <div className="px-6 py-4 bg-gradient-to-r from-gray-50 to-blue-50 border-t border-gray-200">
-              <p className="text-sm text-gray-600 mb-3 font-medium">Try asking:</p>
-              <div className="flex flex-wrap gap-3">
-                {suggestions.map((suggestion, index) => (
-                  <Button
-                    key={index}
-                    variant="outline"
-                    size="sm"
-                    className="text-sm h-9 bg-white hover:bg-gradient-to-r hover:from-blue-500 hover:to-purple-600 hover:text-white border-gray-300 hover:border-transparent transition-all duration-200 shadow-sm hover:shadow-md"
-                    onClick={() => setInputValue(suggestion)}
-                  >
-                    {suggestion}
-                  </Button>
-                ))}
+                {message.role === "user" && (
+                  <User className="w-5 h-5 mt-0.5 text-primary" />
+                )}
+              </div>
+              <div className="text-xs opacity-70 mt-2">
+                {message.timestamp.toLocaleTimeString()}
               </div>
             </div>
-          )}
-
-          <div className="p-6 bg-gradient-to-r from-gray-50 to-blue-50 border-t border-gray-200">
-            <div className="flex gap-3">
-              <Input
-                value={inputValue}
-                onChange={(e) => setInputValue(e.target.value)}
-                onKeyPress={handleKeyPress}
-                placeholder={`Ask me anything about ${userRole === "patient" ? "appointments and healthcare" : "your practice and patients"}...`}
-                disabled={isLoading}
-                className="flex-1 border-gray-300 focus:border-blue-500 focus:ring-blue-500 rounded-xl px-4 py-3 text-sm shadow-sm"
-              />
-              <Button
-                onClick={handleSendMessage}
-                disabled={!inputValue.trim() || isLoading}
-                size="icon"
-                className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white rounded-xl w-12 h-12 shadow-lg hover:shadow-xl transition-all duration-200"
-              >
-                {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
-              </Button>
+          </div>
+        ))}
+        
+        {isLoading && (
+          <div className="flex justify-start">
+            <div className="bg-muted rounded-lg p-3">
+              <div className="flex items-center gap-2">
+                <Loader2 className="w-5 h-5 animate-spin text-primary" />
+                <span className="text-sm">Thinking...</span>
+              </div>
             </div>
           </div>
-        </CardContent>
-      </Card>
+        )}
+      </ScrollArea>
+
+      {/* Input Area */}
+      <div className="border-t p-4">
+        <div className="flex gap-2">
+          <Input
+            value={inputValue}
+            onChange={(e) => setInputValue(e.target.value)}
+            onKeyPress={(e) => e.key === "Enter" && handleSendMessage()}
+            placeholder={
+              userRole === "patient"
+                ? "Ask me to schedule an appointment, check availability..."
+                : "Ask me about appointment stats, patient reports..."
+            }
+            disabled={isLoading}
+            className="flex-1"
+          />
+          <Button onClick={handleSendMessage} disabled={isLoading || !inputValue.trim()}>
+            <Send className="w-4 h-4" />
+          </Button>
+        </div>
+        
+        {/* Quick Actions */}
+        <div className="mt-3 flex flex-wrap gap-2">
+          {userRole === "patient" ? (
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleSuggestionClick("Schedule an appointment")}
+                className="text-xs h-7"
+              >
+                <Calendar className="w-3 h-3 mr-1" />
+                Schedule
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleSuggestionClick("Check doctor availability")}
+                className="text-xs h-7"
+              >
+                <Stethoscope className="w-3 h-3 mr-1" />
+                Check Availability
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleSuggestionClick("View appointment stats")}
+                className="text-xs h-7"
+              >
+                <BarChart3 className="w-3 h-3 mr-1" />
+                View Stats
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleSuggestionClick("Search patients by symptoms")}
+                className="text-xs h-7"
+              >
+                <Stethoscope className="w-3 h-3 mr-1" />
+                Search Patients
+              </Button>
+            </>
+          )}
+        </div>
+      </div>
     </div>
   )
 }
