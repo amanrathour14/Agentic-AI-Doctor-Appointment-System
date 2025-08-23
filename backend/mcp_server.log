@@ -9,3 +9,6 @@ INFO:     127.0.0.1:37720 - "GET /mcp HTTP/1.1" 200 OK
 INFO:     127.0.0.1:39936 - "GET /mcp/tools HTTP/1.1" 200 OK
 INFO:     127.0.0.1:39950 - "POST /mcp/tools/call HTTP/1.1" 200 OK
 INFO:     127.0.0.1:40134 - "GET /mcp HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41256 - "GET /mcp HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41268 - "GET /mcp/tools HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41282 - "POST /mcp/tools/call HTTP/1.1" 200 OK

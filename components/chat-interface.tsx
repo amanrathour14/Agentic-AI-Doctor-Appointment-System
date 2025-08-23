@@ -39,6 +39,7 @@ export default function ChatInterface({ userRole = "patient" }: { userRole?: str
   const [showTools, setShowTools] = useState(false)
   const [mcpStatus, setMcpStatus] = useState<string>("checking")
   const [mcpError, setMcpError] = useState<string>("")
+  const [showDebug, setShowDebug] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   // Ensure sessionId is always a string
@@ -206,17 +207,38 @@ export default function ChatInterface({ userRole = "patient" }: { userRole?: str
         }
         setMessages(prev => [...prev, assistantMessage])
       } else {
-        throw new Error("Failed to get response")
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
       }
     } catch (error) {
       console.error("Error processing message:", error)
-      const errorMessage: ChatMessage = {
+      
+      // Provide more helpful error messages based on the error type
+      let errorMessage = "I'm sorry, I encountered an error processing your request. Please try again."
+      
+      if (error instanceof Error) {
+        if (error.message.includes("Failed to fetch")) {
+          errorMessage = "I'm having trouble connecting to my tools right now. Please check your internet connection and try again."
+        } else if (error.message.includes("HTTP 500")) {
+          errorMessage = "There's a server error. Please try again in a few moments."
+        } else if (error.message.includes("HTTP 404")) {
+          errorMessage = "The requested service is not available right now. Please try again later."
+        } else if (error.message.includes("timeout")) {
+          errorMessage = "The request is taking too long. Please try again."
+        }
+      }
+      
+      const errorResponse: ChatMessage = {
         id: (Date.now() + 1).toString(),
         role: "assistant",
-        content: "I'm sorry, I encountered an error processing your request. Please try again.",
-        timestamp: new Date()
+        content: errorMessage,
+        timestamp: new Date(),
+        toolCalls: [{
+          tool_name: "error_handler",
+          result: { error: error instanceof Error ? error.message : String(error) },
+          success: false
+        }]
       }
-      setMessages(prev => [...prev, errorMessage])
+      setMessages(prev => [...prev, errorResponse])
     } finally {
       setIsLoading(false)
     }
@@ -224,15 +246,18 @@ export default function ChatInterface({ userRole = "patient" }: { userRole?: str
 
   const processMessageWithMCP = async (message: string, role: string): Promise<ChatMessage | null> => {
     if (safeMcpStatus !== "connected") {
+      console.log("MCP not connected, skipping tool execution")
       return null
     }
 
+    console.log("Processing message with MCP:", message)
     const lowerMessage = message.toLowerCase()
     
     // Check for appointment scheduling
-    if (lowerMessage.includes("schedule") || lowerMessage.includes("book") || lowerMessage.includes("appointment")) {
+    if (lowerMessage.includes("schedule") || lowerMessage.includes("book") || lowerMessage.includes("appointment") || lowerMessage.includes("confirm")) {
+      console.log("Executing schedule_appointment tool")
       try {
-        const result = await appointmentTools.scheduleAppointment({
+        const result = await mcpClient.executeTool('schedule_appointment', {
           doctor_name: "Dr. Smith", // Default - would be extracted from message
           patient_name: "John Doe", // Default - would be extracted from message
           patient_email: "john@example.com", // Default - would be extracted from message
@@ -240,6 +265,8 @@ export default function ChatInterface({ userRole = "patient" }: { userRole?: str
           appointment_time: "10:00", // Default - would be extracted from message
           symptoms: "General consultation"
         })
+
+        console.log("Schedule appointment result:", result)
 
         // Safe access to result properties with fallbacks
         const resultText = result?.content?.[0]?.text || 'Processing...'
@@ -263,12 +290,15 @@ export default function ChatInterface({ userRole = "patient" }: { userRole?: str
     }
 
     // Check for doctor availability
-    if (lowerMessage.includes("availability") || lowerMessage.includes("available")) {
+    if (lowerMessage.includes("availability") || lowerMessage.includes("available") || lowerMessage.includes("slot") || lowerMessage.includes("time")) {
+      console.log("Executing check_doctor_availability tool")
       try {
-        const result = await appointmentTools.checkDoctorAvailability({
+        const result = await mcpClient.executeTool('check_doctor_availability', {
           doctor_name: "Dr. Smith",
           date: "2024-01-15"
         })
+
+        console.log("Check availability result:", result)
 
         // Safe access to result properties with fallbacks
         const resultText = result?.content?.[0]?.text || 'Checking availability...'
@@ -292,9 +322,12 @@ export default function ChatInterface({ userRole = "patient" }: { userRole?: str
     }
 
     // Check for doctor listing
-    if (lowerMessage.includes("doctors") || lowerMessage.includes("list")) {
+    if (lowerMessage.includes("doctors") || lowerMessage.includes("list") || lowerMessage.includes("specialist") || lowerMessage.includes("cardiologist")) {
+      console.log("Executing list_doctors tool")
       try {
-        const result = await appointmentTools.listDoctors()
+        const result = await mcpClient.executeTool('list_doctors', {})
+
+        console.log("List doctors result:", result)
 
         // Safe access to result properties with fallbacks
         const resultText = result?.content?.[0]?.text || 'Loading doctors...'
@@ -317,6 +350,134 @@ export default function ChatInterface({ userRole = "patient" }: { userRole?: str
       }
     }
 
+    // Check for patient search by symptoms
+    if (lowerMessage.includes("search") || lowerMessage.includes("symptoms") || lowerMessage.includes("fever") || lowerMessage.includes("patients")) {
+      console.log("Executing search_patients_by_symptoms tool")
+      try {
+        const result = await mcpClient.executeTool('search_patients_by_symptoms', {
+          symptoms: "fever" // Default - would be extracted from message
+        })
+
+        console.log("Search patients result:", result)
+
+        // Safe access to result properties with fallbacks
+        const resultText = result?.content?.[0]?.text || 'Searching patients...'
+        const isError = result?.isError || false
+
+        return {
+          id: (Date.now() + 1).toString(),
+          role: "assistant",
+          content: `Here are the patients with fever symptoms:\n\n${resultText}`,
+          timestamp: new Date(),
+          toolCalls: [{
+            tool_name: "search_patients_by_symptoms",
+            result: result || {},
+            success: !isError
+          }]
+        }
+      } catch (error) {
+        console.error("Error searching patients:", error)
+        return null
+      }
+    }
+
+    // Check for appointment statistics
+    if (lowerMessage.includes("statistics") || lowerMessage.includes("analytics") || lowerMessage.includes("how many") || lowerMessage.includes("report")) {
+      console.log("Executing get_appointment_statistics tool")
+      try {
+        const result = await mcpClient.executeTool('get_appointment_statistics', {
+          doctor_name: "Dr. Smith",
+          period: "week"
+        })
+
+        console.log("Get statistics result:", result)
+
+        // Safe access to result properties with fallbacks
+        const resultText = result?.content?.[0]?.text || 'Loading statistics...'
+        const isError = result?.isError || false
+
+        return {
+          id: (Date.now() + 1).toString(),
+          role: "assistant",
+          content: `Here are the appointment statistics for this week:\n\n${resultText}`,
+          timestamp: new Date(),
+          toolCalls: [{
+            tool_name: "get_appointment_statistics",
+            result: result || {},
+            success: !isError
+          }]
+        }
+      } catch (error) {
+        console.error("Error getting statistics:", error)
+        return null
+      }
+    }
+
+    // Check for appointment cancellation
+    if (lowerMessage.includes("cancel") || lowerMessage.includes("reschedule")) {
+      console.log("Executing cancel_calendar_event tool")
+      try {
+        const result = await mcpClient.executeTool('cancel_calendar_event', {
+          event_id: "appointment_123", // Default - would be extracted from message
+          reason: "Patient request"
+        })
+
+        console.log("Cancel appointment result:", result)
+
+        // Safe access to result properties with fallbacks
+        const resultText = result?.content?.[0]?.text || 'Processing cancellation...'
+        const isError = result?.isError || false
+
+        return {
+          id: (Date.now() + 1).toString(),
+          role: "assistant",
+          content: `I've processed your cancellation request:\n\n${resultText}`,
+          timestamp: new Date(),
+          toolCalls: [{
+            tool_name: "cancel_calendar_event",
+            result: result || {},
+            success: !isError
+          }]
+        }
+      } catch (error) {
+        console.error("Error cancelling appointment:", error)
+        return null
+      }
+    }
+
+    // Check for appointment status
+    if (lowerMessage.includes("status") || lowerMessage.includes("check") || lowerMessage.includes("appointment")) {
+      console.log("Executing get_appointment_statistics tool for status")
+      try {
+        const result = await mcpClient.executeTool('get_appointment_statistics', {
+          doctor_name: "Dr. Smith",
+          period: "today"
+        })
+
+        console.log("Check status result:", result)
+
+        // Safe access to result properties with fallbacks
+        const resultText = result?.content?.[0]?.text || 'Checking appointment status...'
+        const isError = result?.isError || false
+
+        return {
+          id: (Date.now() + 1).toString(),
+          role: "assistant",
+          content: `Here's your appointment status:\n\n${resultText}`,
+          timestamp: new Date(),
+          toolCalls: [{
+            tool_name: "get_appointment_statistics",
+            result: result || {},
+            success: !isError
+          }]
+        }
+      } catch (error) {
+        console.error("Error checking appointment status:", error)
+        return null
+      }
+    }
+
+    console.log("No MCP tool matched for message:", message)
     return null
   }
 
@@ -418,13 +579,24 @@ export default function ChatInterface({ userRole = "patient" }: { userRole?: str
             </div>
             
             {safeMcpStatus === "connected" && (
-              <button
-                onClick={() => setShowTools(!safeShowTools)}
-                className="flex items-center space-x-2 px-3 py-2 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
-              >
-                <Tool className="w-4 h-4" />
-                <span>MCP Tools ({safeAvailableTools.length})</span>
-              </button>
+              <>
+                <button
+                  onClick={() => setShowTools(!safeShowTools)}
+                  className="flex items-center space-x-2 px-3 py-2 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                >
+                  <Tool className="w-4 h-4" />
+                  <span>MCP Tools ({safeAvailableTools.length})</span>
+                </button>
+                
+                {/* Debug Panel Toggle */}
+                <button
+                  onClick={() => setShowDebug(!showDebug)}
+                  className="flex items-center space-x-2 px-3 py-2 text-sm bg-yellow-100 hover:bg-yellow-200 rounded-lg transition-colors"
+                >
+                  <Wrench className="w-4 h-4" />
+                  <span>Debug</span>
+                </button>
+              </>
             )}
           </div>
         </div>
@@ -466,6 +638,55 @@ export default function ChatInterface({ userRole = "patient" }: { userRole?: str
               {safeMcpStatus === "connected" ? "No tools available" : "Tools not loaded - check MCP connection"}
             </div>
           )}
+        </div>
+      )}
+
+      {/* Debug Panel */}
+      {showDebug && (
+        <div className="bg-yellow-50 border-b border-yellow-200 p-4">
+          <h3 className="text-sm font-medium text-yellow-700 mb-3">MCP Debug Information</h3>
+          <div className="space-y-2 text-xs">
+            <div><strong>MCP Status:</strong> {safeMcpStatus}</div>
+            <div><strong>MCP Error:</strong> {safeMcpError || 'None'}</div>
+            <div><strong>Available Tools:</strong> {safeAvailableTools.length}</div>
+            <div><strong>Session ID:</strong> {safeSessionId || 'Not set'}</div>
+            <div><strong>User Role:</strong> {safeUserRole}</div>
+            <div><strong>MCP Server URL:</strong> {process.env.NEXT_PUBLIC_MCP_SERVER_URL || 'http://localhost:8000'}</div>
+            
+            {/* Test MCP Connection Button */}
+            <button
+              onClick={async () => {
+                try {
+                  const healthy = await mcpClient.healthCheck()
+                  console.log("MCP Health Check Result:", healthy)
+                  alert(`MCP Health Check: ${healthy ? 'SUCCESS' : 'FAILED'}`)
+                } catch (error) {
+                  console.error("MCP Health Check Error:", error)
+                  alert(`MCP Health Check Error: ${error}`)
+                }
+              }}
+              className="px-3 py-1 text-xs bg-blue-500 hover:bg-blue-600 text-white rounded transition-colors"
+            >
+              Test MCP Connection
+            </button>
+            
+            {/* Test Tool Discovery Button */}
+            <button
+              onClick={async () => {
+                try {
+                  const tools = await mcpClient.discoverTools()
+                  console.log("MCP Tools Discovery Result:", tools)
+                  alert(`MCP Tools Discovery: ${tools.tools.length} tools found`)
+                } catch (error) {
+                  console.error("MCP Tools Discovery Error:", error)
+                  alert(`MCP Tools Discovery Error: ${error}`)
+                }
+              }}
+              className="px-3 py-1 text-xs bg-green-500 hover:bg-green-600 text-white rounded transition-colors ml-2"
+            >
+              Test Tool Discovery
+            </button>
+          </div>
         </div>
       )}
 
