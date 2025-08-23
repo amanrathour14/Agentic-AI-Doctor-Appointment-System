@@ -8,3 +8,4 @@ INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
 INFO:     127.0.0.1:37720 - "GET /mcp HTTP/1.1" 200 OK
 INFO:     127.0.0.1:39936 - "GET /mcp/tools HTTP/1.1" 200 OK
 INFO:     127.0.0.1:39950 - "POST /mcp/tools/call HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40134 - "GET /mcp HTTP/1.1" 200 OK
