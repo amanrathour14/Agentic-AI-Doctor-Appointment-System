@@ -14,7 +14,7 @@ from datetime import datetime, date
 
 # Import existing services
 from config import settings
-from mcp_server import MCPServer, MCPTool
+from mcp_server import MCPServer, MCPTool, MCPToolType
 from llm_agent import DoctorAppointmentAgent
 from google_calendar_service import calendar_service
 from email_service import email_service
@@ -235,10 +235,18 @@ def _register_enhanced_tools():
                     "attendees": [patient_email]
                 }
                 
-                # TODO: Uncomment when Google Calendar integration is complete
-                # calendar_event = await calendar_service.create_appointment_event(event_details)
-                
-                calendar_event = {"id": "mock_event_id", "status": "created"}
+                # Create actual Google Calendar event
+                if calendar_service.is_available():
+                    calendar_event = await calendar_service.create_appointment_event(
+                        doctor_name=doctor_name,
+                        patient_name=patient_name,
+                        patient_email=patient_email,
+                        appointment_date=appointment_date,
+                        appointment_time=appointment_time,
+                        symptoms=symptoms
+                    )
+                else:
+                    calendar_event = {"id": "mock_event_id", "status": "calendar_unavailable"}
                 
             except Exception as e:
                 logger.warning(f"Google Calendar integration failed: {e}")
@@ -259,10 +267,18 @@ def _register_enhanced_tools():
                     }
                 }
                 
-                # TODO: Uncomment when email service is complete
-                # email_result = await email_service.send_appointment_confirmation(email_content)
-                
-                email_result = {"status": "email_sent", "message_id": "mock_message_id"}
+                # Send actual confirmation email
+                if email_service.is_available():
+                    email_result = await email_service.send_appointment_confirmation(
+                        patient_email=patient_email,
+                        patient_name=patient_name,
+                        doctor_name=doctor_name,
+                        appointment_date=appointment_date,
+                        appointment_time=appointment_time,
+                        symptoms=symptoms
+                    )
+                else:
+                    email_result = {"status": "email_unavailable", "message": "Email service not configured"}
                 
             except Exception as e:
                 logger.warning(f"Email service failed: {e}")
@@ -311,7 +327,7 @@ def _register_enhanced_tools():
             "required": ["doctor_name", "patient_name", "patient_email", "appointment_date", "appointment_time"]
         },
         handler=enhanced_schedule_appointment,
-        type=mcp_server.MCPToolType.FUNCTION
+        type=MCPToolType.FUNCTION
     )
 
 # Initialize enhanced tools
