@@ -1,5 +1,5 @@
 """
-Database models for the doctor appointment system using SQLAlchemy
+Database models for the doctor appointment system using SQLAlchemy with MySQL
 """
 from sqlalchemy import create_engine, Column, Integer, String, Date, Time, Text, Boolean, DateTime, ForeignKey
 from sqlalchemy.ext.declarative import declarative_base
@@ -13,7 +13,7 @@ Base = declarative_base()
 class Doctor(Base):
     __tablename__ = 'doctors'
     
-    id = Column(Integer, primary_key=True)
+    id = Column(Integer, primary_key=True, autoincrement=True)
     name = Column(String(255), nullable=False)
     email = Column(String(255), unique=True, nullable=False)
     specialization = Column(String(255), nullable=False)
@@ -29,7 +29,7 @@ class Doctor(Base):
 class Patient(Base):
     __tablename__ = 'patients'
     
-    id = Column(Integer, primary_key=True)
+    id = Column(Integer, primary_key=True, autoincrement=True)
     name = Column(String(255), nullable=False)
     email = Column(String(255), unique=True, nullable=False)
     phone = Column(String(20))
@@ -44,9 +44,9 @@ class Patient(Base):
 class Appointment(Base):
     __tablename__ = 'appointments'
     
-    id = Column(Integer, primary_key=True)
-    doctor_id = Column(Integer, ForeignKey('doctors.id'), nullable=False)
-    patient_id = Column(Integer, ForeignKey('patients.id'), nullable=False)
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    doctor_id = Column(Integer, ForeignKey('doctors.id', ondelete='CASCADE'), nullable=False)
+    patient_id = Column(Integer, ForeignKey('patients.id', ondelete='CASCADE'), nullable=False)
     appointment_date = Column(Date, nullable=False)
     appointment_time = Column(Time, nullable=False)
     duration_minutes = Column(Integer, default=30)
@@ -65,10 +65,10 @@ class Appointment(Base):
 class VisitHistory(Base):
     __tablename__ = 'visit_history'
     
-    id = Column(Integer, primary_key=True)
-    appointment_id = Column(Integer, ForeignKey('appointments.id'), nullable=False)
-    doctor_id = Column(Integer, ForeignKey('doctors.id'), nullable=False)
-    patient_id = Column(Integer, ForeignKey('patients.id'), nullable=False)
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    appointment_id = Column(Integer, ForeignKey('appointments.id', ondelete='CASCADE'), nullable=False)
+    doctor_id = Column(Integer, ForeignKey('doctors.id', ondelete='CASCADE'), nullable=False)
+    patient_id = Column(Integer, ForeignKey('patients.id', ondelete='CASCADE'), nullable=False)
     visit_date = Column(Date, nullable=False)
     diagnosis = Column(Text)
     symptoms = Column(Text)
@@ -84,9 +84,9 @@ class VisitHistory(Base):
 class DoctorAvailability(Base):
     __tablename__ = 'doctor_availability'
     
-    id = Column(Integer, primary_key=True)
-    doctor_id = Column(Integer, ForeignKey('doctors.id'), nullable=False)
-    day_of_week = Column(Integer, nullable=False)  # 0=Sunday, 1=Monday, etc.
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    doctor_id = Column(Integer, ForeignKey('doctors.id', ondelete='CASCADE'), nullable=False)
+    day_of_week = Column(Integer, nullable=False)  # 1=Monday, 2=Tuesday, etc.
     start_time = Column(Time, nullable=False)
     end_time = Column(Time, nullable=False)
     is_available = Column(Boolean, default=True)
@@ -98,12 +98,23 @@ class DoctorAvailability(Base):
 # Database connection and session management
 def get_database_url():
     """Get database URL from environment variables"""
-    return os.getenv('DATABASE_URL', 'mysql://root:password@localhost/doctor_appointments')
+    return os.getenv('DATABASE_URL', 'mysql+pymysql://medai_user:medai_password@127.0.0.1:3306/doctor_appointments')
 
 def create_database_engine():
-    """Create database engine"""
+    """Create database engine with MySQL-specific configurations"""
     database_url = get_database_url()
-    return create_engine(database_url)
+    return create_engine(
+        database_url,
+        pool_pre_ping=True,
+        pool_recycle=3600,
+        echo=False,
+        # MySQL-specific configurations
+        connect_args={
+            "charset": "utf8mb4",
+            "use_unicode": True,
+            "autocommit": False
+        }
+    )
 
 def get_session():
     """Get database session"""
@@ -119,4 +130,4 @@ def create_tables():
 if __name__ == "__main__":
     # Create tables when run directly
     create_tables()
-    print("Database tables created successfully!")
+    print("MySQL database tables created successfully!")

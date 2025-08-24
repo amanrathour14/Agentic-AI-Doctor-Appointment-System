@@ -256,7 +256,7 @@ class DemoRunner:
             "📱 Responsive web interface for all devices",
             "🔐 Session-based conversation management",
             "⚡ High-performance FastAPI backend",
-            "🗄️ PostgreSQL database with SQLAlchemy ORM"
+            "🗄️ MySQL database with SQLAlchemy ORM"
         ]
         
         print("This system demonstrates:")
