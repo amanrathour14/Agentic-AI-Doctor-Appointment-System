@@ -37,15 +37,15 @@ pip install -r requirements-simple.txt
 ### 3. Database Setup
 
 ```bash
-# Start PostgreSQL (if not running)
-sudo systemctl start postgresql
+# Start MySQL (if not running)
+sudo systemctl start mysql
 
-# Create database
-sudo -u postgres createdb doctor_appointments
+# Run MySQL setup script
+chmod +x scripts/setup_mysql.sh
+./scripts/setup_mysql.sh
 
-# Run schema setup
-psql -U postgres -d doctor_appointments -f scripts/01_create_database_schema.sql
-psql -U postgres -d doctor_appointments -f scripts/02_seed_sample_data.sql
+# Run MySQL schema setup
+mysql -u medai_user -pmedai_password doctor_appointments < scripts/01_create_database_schema_mysql.sql
 ```
 
 ### 4. Test Basic System

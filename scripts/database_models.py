@@ -98,7 +98,7 @@ class DoctorAvailability(Base):
 # Database connection and session management
 def get_database_url():
     """Get database URL from environment variables"""
-    return os.getenv('DATABASE_URL', 'postgresql://user:password@localhost/doctor_appointments')
+    return os.getenv('DATABASE_URL', 'mysql://root:password@localhost/doctor_appointments')
 
 def create_database_engine():
     """Create database engine"""

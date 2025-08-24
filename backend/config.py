@@ -7,7 +7,7 @@ from typing import Optional
 
 class Settings(BaseSettings):
     # Database
-    database_url: str = os.getenv('DATABASE_URL', 'postgresql://user:password@localhost/doctor_appointments')
+    database_url: str = os.getenv('DATABASE_URL', 'mysql://root:password@localhost/doctor_appointments')
     
     # API Keys
     openai_api_key: Optional[str] = os.getenv('OPENAI_API_KEY')
